@@ -171,6 +171,74 @@ Found <X> errors in <Y> files (checked <Z> source files)
 3. **Order matters**: Errors appear before their associated notes
 4. **Graceful fallback**: Not all lines match patterns (empty lines, special messages)
 
+### Parsing Gotchas and Solutions
+
+#### Optional Regex Groups
+When using regex patterns, not all groups may be present:
+```python
+# DANGEROUS: Assumes column group exists
+column = int(match.group("column")) if match.group("column") else None
+
+# SAFE: Check group existence first
+groupdict = match.groupdict()
+column = int(groupdict["column"]) if "column" in groupdict and groupdict["column"] else None
+```
+
+#### Line Number Tracking
+Track line numbers consistently:
+```python
+# Use 1-based numbering to match editors
+for line_number, line in enumerate(lines, start=1):
+    # line_number matches what users see in editors
+```
+
+#### Parse Errors as Data
+Instead of failing on unparseable lines, collect them:
+```python
+@dataclass
+class ParseError:
+    line_number: int
+    line_content: str
+    reason: str | None = None
+
+# Collect errors instead of raising
+parse_errors = []
+if not any_pattern_matched:
+    parse_errors.append(ParseError(line_num, line, "No pattern matched"))
+```
+
+### Parser Configuration Strategies
+
+#### Minimal Output (No Columns)
+For mypy run with `--no-column-numbers`:
+```python
+config = ParserConfig(show_column_numbers=False)
+```
+
+#### Full Output (With End Positions)
+For mypy run with `--show-column-numbers --show-error-end`:
+```python
+config = ParserConfig(
+    show_column_numbers=True,
+    show_error_end=True
+)
+```
+
+#### Debug Mode
+Enable debug output to troubleshoot parsing:
+```python
+config = ParserConfig(debug=True)
+# Outputs: [DEBUG] Line 1: Parsed as diagnostic
+```
+
+### Integration Recommendations
+
+1. **Use a dedicated parser library**: See `dr_cli.typecheck.parser` for a reference implementation
+2. **Support configuration**: Allow users to match their mypy settings
+3. **Handle malformed output**: Real-world mypy output may include unexpected lines
+4. **Preserve line numbers**: Essential for correlating parse errors with input
+5. **Test with various formats**: Mypy output varies based on configuration flags
+
 ### Alternative Output Formats
 
 #### JUnit XML (--junit-xml)
@@ -197,3 +265,81 @@ Generates type coverage reports, not error listings.
 - **Pyright compatibility**: Proposed to match Pyright's `--outputjson` format
 - **Feature requests**: Track #10816 and #13874 on GitHub for updates
 - **Workaround**: Parse text output and generate custom JSON/structured formats
+
+## Context-Dependent Error Counting
+
+### The Cross-Directory Error Phenomenon
+
+When checking multiple directories, mypy can produce different error counts than the sum of individual directory checks:
+
+```bash
+# Individual checks
+mypy src/    # 230 errors
+mypy tests/  # 255 errors  
+mypy scripts/ # 158 errors
+# Total: 643 errors
+
+# Combined check
+mypy src/ scripts/ tests/  # 1261 errors (!)
+# Difference: 618 additional "cross-directory" errors
+```
+
+### Why This Happens
+
+Mypy generates context-dependent errors based on how code is used across module boundaries:
+
+1. **Import Resolution**: When checking directories together, mypy can resolve imports and detect type mismatches:
+   ```python
+   # src/utils.py
+   def process_data(x):  # Missing type annotation
+       return x * 2
+   
+   # tests/test_utils.py
+   result: str = process_data(5)  # Error only when checked together!
+   ```
+
+2. **Usage Context Errors**: Untyped functions generate additional errors where they're called:
+   ```
+   # When checking src/ alone:
+   src/utils.py:10: error: Function is missing a type annotation
+   
+   # When checking with tests/:
+   src/utils.py:10: error: Function is missing a type annotation
+   tests/test.py:5: error: Call to untyped function "process_data" in typed context
+   ```
+
+3. **Transitive Dependencies**: Test files often import src files, causing mypy to check those src files multiple times with different contexts.
+
+### Implications for Error Reduction
+
+1. **Cascade Effect**: Fixing type annotations in core modules eliminates both:
+   - Direct errors (missing annotations)
+   - Indirect errors (calls to untyped functions)
+
+2. **Prioritization**: Focus on heavily-imported modules for maximum impact
+
+3. **True Baseline**: Always check all directories together for accurate error counts
+
+### Detecting Cross-Directory Errors
+
+```bash
+# Script to identify cross-directory errors
+for dir in src scripts tests; do 
+    mypy --output-format jsonl --output-file ".${dir}_errors.jsonl" "$dir"
+done
+
+# Check combined
+mypy --output-format jsonl --output-file ".all_errors.jsonl" src scripts tests
+
+# Compare counts
+individual_total=$(jq -r '.error_count' .src_errors.jsonl .scripts_errors.jsonl .tests_errors.jsonl | awk '{sum+=$1} END {print sum}')
+combined_total=$(jq -r '.error_count' .all_errors.jsonl)
+echo "Cross-directory errors: $((combined_total - individual_total))"
+```
+
+### Best Practices
+
+1. **Always run mypy on all directories** for accurate error counts
+2. **Fix src/ types first** to maximize cascade benefits  
+3. **Expect non-additive error counts** when dealing with interconnected modules
+4. **Use file-specific error analysis** to understand which modules generate the most cross-directory errors
