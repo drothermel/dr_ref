@@ -1,0 +1,247 @@
+Based on my review of the files, here's a summary of the ruff rules currently configured in your pyproject.toml:
+
+## Currently Active Rules (via `extend-select`):
+- **A**: flake8-builtins (prevents shadowing Python builtins)
+  - A001: Variable shadowing builtin (e.g., `max = 5` shadows builtin `max()`)
+  - A002: Function argument shadowing builtin (e.g., `def foo(input):`)
+  - A003: Class attribute shadowing builtin
+- **ANN**: flake8-annotations (enforces type hints)
+  - ANN001: Missing function argument type annotation
+  - ANN201: Missing return type annotation
+  - ANN101/102: Missing type for self/cls (removed in newer versions)
+  - ANN401: Dynamically typed expressions (typing.Any) are disallowed (IGNORED)
+- **ARG**: flake8-unused-arguments
+  - ARG001: Unused function argument (IGNORED)
+  - ARG002: Unused method argument
+  - ARG005: Unused lambda argument
+- **B**: flake8-bugbear (detects likely bugs)
+  - B006: Mutable argument defaults (e.g., `def foo(x=[]): `)
+  - B008: Function call in argument defaults (e.g., `def foo(x=time.time()):`)
+  - B011: Do not assert False (IGNORED - part of coding style)
+  - B019: `functools.lru_cache` on methods can cause memory leaks
+  - B023: Function in loop uses loop variable (late-binding closure issue)
+- **BLE**: flake8-blind-except
+  - BLE001: Blind except (e.g., `except:` or `except Exception:`)
+- **COM**: flake8-commas
+  - COM812: Missing trailing comma (IGNORED - conflicts with ISC001)
+  - COM818: Trailing comma on bare tuple prohibited
+  - COM819: Trailing comma prohibited on single-line expressions
+- **C4**: flake8-comprehensions
+  - C400: Unnecessary generator - use `list()` directly
+  - C401: Unnecessary generator - use `set()` directly  
+  - C408: Unnecessary `dict()` call - use literal `{}`
+  - C416: Unnecessary comprehension - use `list(x)` not `[i for i in x]`
+- **C90**: mccabe complexity
+  - C901: Function too complex (cyclomatic complexity > 15)
+- **D**: pydocstyle (docstring conventions)
+  - D100: Missing module docstring
+  - D101: Missing class docstring
+  - D102: Missing method docstring  
+  - D103: Missing function docstring
+  - D104: Missing package docstring
+  - D400: First line should end with a period
+  - D401: First line should be in imperative mood
+- **DTZ**: flake8-datetimez (timezone awareness)
+  - DTZ001: `datetime()` without `tzinfo` argument
+  - DTZ002: `datetime.today()` used (use `datetime.now(tz=)` instead)
+  - DTZ005: `datetime.now()` without `tz` argument
+- **E**: pycodestyle errors
+  - E101: Mixed spaces and tabs in indentation
+  - E111: Indentation not multiple of indent width
+  - E501: Line too long (88+ chars)
+  - E711: Comparison to `None` should use `is None`
+  - E712: Avoid equality comparisons to `True/False`
+  - E722: Do not use bare `except`
+- **ERA**: eradicate (commented-out code)
+  - ERA001: Found commented-out code
+- **EXE**: flake8-executable
+  - EXE001: Shebang not executable
+  - EXE002: File is executable but has no shebang
+- **F**: pyflakes
+  - F401: Unused import
+  - F821: Undefined name  
+  - F841: Unused local variable
+  - F631: Assert test is non-empty tuple (always True)
+- **FA**: flake8-future-annotations
+  - FA100: Missing `from __future__ import annotations`
+  - FA102: Missing `from __future__ import annotations` but uses string type hints
+- **FBT**: flake8-boolean-trap
+  - FBT001: Boolean positional argument in function definition (IGNORED)
+  - FBT002: Boolean default value in function definition (IGNORED)
+  - FBT003: Boolean positional argument in function call
+- **FIX**: flake8-fixme
+  - FIX001: Line contains FIXME
+  - FIX002: Line contains TODO (IGNORED)
+  - FIX003: Line contains XXX
+  - FIX004: Line contains HACK
+- **FLY**: flynt
+  - FLY002: Consider f-string instead of string join
+- **I**: isort (import sorting)
+  - I001: Import block is unsorted or formatted incorrectly
+  - I002: Missing required import
+- **ICN**: flake8-import-conventions
+  - ICN001: Import should be `import numpy as np`
+  - ICN002: Import should be `import pandas as pd`
+  - ICN003: Import should be `import matplotlib.pyplot as plt`
+- **INP**: flake8-no-pep420
+  - INP001: Implicit namespace package (missing `__init__.py`)
+- **INT**: flake8-gettext
+  - INT001: f-string used in gettext function
+  - INT002: `.format()` used in gettext function
+  - INT003: `%` formatting used in gettext function
+- **ISC**: flake8-implicit-str-concat (ISC001 IGNORED - conflicts with COM812)
+  - ISC001: Implicitly concatenated string literals on one line
+  - ISC002: Implicitly concatenated string literals over multiple lines
+  - ISC003: Explicitly concatenated string should be implicitly concatenated
+- **LOG**: flake8-logging
+  - LOG001: Use `logging.getLogger(__name__)` for logger
+  - LOG002: Use `logging.getLogger(__name__)` in function
+  - LOG007: Use `%` formatting in logging functions
+  - LOG009: Use `logging.getLogger()` to get a logger
+- **N**: pep8-naming
+  - N801: Class name should use CapWords convention
+  - N802: Function name should be lowercase
+  - N803: Argument name should be lowercase
+  - N806: Variable in function should be lowercase
+  - N999: Invalid module name
+- **NPY**: numpy-specific rules
+  - NPY001: `np.random.Generator` instead of `np.random`
+  - NPY002: Replace legacy `np.random.seed`
+  - NPY003: Replace deprecated NumPy type aliases
+- **PD**: pandas-vet
+  - PD002: `inplace=True` should be avoided
+  - PD003: Use `.loc` for indexing
+  - PD008: Use `.loc` or `.iloc` for indexing
+  - PD011: Use `.to_numpy()` instead of `.values`
+  - PD901: Avoid `df` as variable name
+- **PERF**: perflint (performance)
+  - PERF101: Don't cast to `list` unnecessarily
+  - PERF102: When using only keys, iterate over dict directly
+  - PERF203: Use `dict.get(key, "default")` instead of conditional assignment
+  - PERF401: Use list comprehension instead of for-loop
+- **PIE**: flake8-pie
+  - PIE790: Unnecessary `pass` statement
+  - PIE794: Duplicate class field definition
+  - PIE800: Unnecessary spread operator
+  - PIE810: Call `startswith` and `endswith` with tuple
+- **PLW**: pylint warnings
+  - PLW2901: `for` loop variable overwritten by assignment target
+- **PLE**: pylint errors  
+  - PLE1142: `__slots__` should be a non-empty tuple
+- **PLR0133, PLR1714, PLR2004**: specific pylint rules
+  - PLR0133: Two constants compared in a comparison
+  - PLR1714: Consider merging multiple comparisons  
+  - PLR2004: Magic value used in comparison (IGNORED in tests)
+- **PT**: flake8-pytest-style
+  - PT001: Use `@pytest.fixture()` over `@pytest.fixture`
+  - PT006: Wrong name(s) type in `@pytest.mark.parametrize`
+  - PT011: `pytest.raises()` too broad
+  - PT015: Assertion always fails, assert False (IGNORED)
+- **PTH**: flake8-use-pathlib
+  - PTH100: `os.path.abspath()` should be replaced by `Path.resolve()`
+  - PTH110: `os.path.exists()` should be replaced by `Path.exists()`
+  - PTH118: `os.path.join()` should be replaced by `Path` operator
+  - PTH123: `open()` should be replaced by `Path.open()`
+- **PYI**: flake8-pyi (stub files)
+  - PYI001: Name of private `TypedDict` must start with `_`
+  - PYI009: Empty body should contain `...`, not `pass`
+  - PYI011: Only literals should be used for default values
+- **Q**: flake8-quotes
+  - Q000: Double quotes found but single quotes preferred
+  - Q001: Single quotes found but double quotes preferred
+  - Q002: Docstring should use double quotes
+  - Q003: Change outer quotes to avoid escaping inner quotes
+- **RET**: flake8-return
+  - RET501: Do not explicitly `return None` in function able to return non-`None`
+  - RET502: Do not implicitly `return None` in function able to return non-`None`
+  - RET503: Missing explicit `return` at end of function able to return non-`None`
+  - RET504: Unnecessary variable assignment before `return`
+- **RSE**: flake8-raise
+  - RSE102: Unnecessary parentheses on raised exception
+- **RUF**: ruff-specific rules
+  - RUF001: String contains ambiguous Unicode character
+  - RUF002: Docstring contains ambiguous Unicode character  
+  - RUF003: Comment contains ambiguous Unicode character
+  - RUF100: Unused `noqa` directive
+- **S**: flake8-bandit (security)
+  - S101: Use of assert detected (IGNORED - part of coding style)
+  - S102: Use of `exec` detected
+  - S103: `os.chmod` setting a permissive mask
+  - S108: Probable insecure usage of temporary file/directory
+  - S113: Requests call without timeout
+  - S324: Probable use of insecure hash functions
+- **SLF**: flake8-self
+  - SLF001: Private member accessed outside of class definition
+- **SIM**: flake8-simplify
+  - SIM102: Use a single `if`-statement instead of nested `if`-statements
+  - SIM108: Use ternary operator instead of `if`-`else`-block
+  - SIM110: Use `any()` instead of `for` loop
+  - SIM118: Use `key in dict` instead of `key in dict.keys()`
+- **T10**: flake8-debugger
+  - T100: Trace found: `pdb` import
+  - T101: Trace found: `pdb.set_trace()`
+  - T102: Trace found: `pprint.pprint()`
+- **T20**: flake8-print
+  - T201: `print` found (IGNORED in scripts)
+  - T203: `pprint` found
+- **TCH**: flake8-type-checking
+  - TCH001: Move application import into `TYPE_CHECKING` block
+  - TCH002: Move third-party import into `TYPE_CHECKING` block
+  - TCH003: Move standard library import into `TYPE_CHECKING` block
+  - TCH004: Move import out of `TYPE_CHECKING` block
+- **TID**: flake8-tidy-imports
+  - TID251: `{name}` is banned
+  - TID252: Relative imports from parent modules are banned
+- **TD**: flake8-todos
+  - TD001: Invalid TODO tag
+  - TD002: Missing author in TODO (IGNORED)
+  - TD003: Missing issue link on TODO line (IGNORED)
+  - TD004: Missing colon in TODO
+- **TRY**: tryceratops
+  - TRY002: Create your own exception
+  - TRY003: Avoid specifying long messages outside exception class (IGNORED)
+  - TRY004: Prefer `TypeError` exception for invalid type
+  - TRY200: Use `raise from` to specify exception cause
+- **UP**: pyupgrade
+  - UP001: Use `()` instead of `list()` 
+  - UP003: Use `{}` instead of `dict()`
+  - UP006: Use `list` instead of `List` for type annotations
+  - UP007: Use `X | Y` for union types instead of `Union[X, Y]`
+  - UP032: Use f-string instead of `.format()`
+- **W**: pycodestyle warnings
+  - W191: Indentation contains tabs
+  - W291: Trailing whitespace
+  - W292: No newline at end of file
+  - W605: Invalid escape sequence
+- **YTT**: flake8-2020
+  - YTT101: `sys.version[:3]` referenced (python version)
+  - YTT102: `sys.version[2]` referenced (python version)
+  - YTT103: `sys.version` compared to string
+
+## Currently Ignored Rules:
+- **COM812**: trailing comma issues (conflicts with ISC001)
+- **ISC001**: implicit string concatenation (conflicts with COM812)
+- **TD002**: include author name with todo
+- **TD003**: link to issue after todo
+- **FIX002**: throws on all TODOs
+- **S101**: assert statements (part of coding style)
+- **PT015**: assert statements in pytest
+- **B011**: assert False (part of coding style)
+- **TRY003**: long error messages
+- **FBT001**: boolean positional argument in function definition (especially in ML code)
+- **FBT002**: boolean default value in function definition (especially in ML code)
+- **ARG001**: unused function argument (common in callbacks and handlers)
+- **ANN401**: dynamically typed expressions (with ML libs, very useful to use Any)
+
+## Per-file Ignores:
+- **tests/**: ARG (unused arguments), PLR2004 (magic values)
+- **src/models/**: PLR0913 (many arguments)
+- **scripts/**: T201 (print statements)
+- **notebooks**: E402 (import order), F401 (unused imports)
+
+## Configuration Settings:
+- **Line length**: 88
+- **McCabe complexity**: 15 (higher for ML code)
+- **Pydocstyle convention**: Google
+- **Pylint max args**: 10
+- **Pylint max statements**: 100
