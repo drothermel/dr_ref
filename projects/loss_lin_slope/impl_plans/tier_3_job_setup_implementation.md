@@ -1,5 +1,48 @@
 # Implementation Plan: Tier 3 Job Creation and Verification
 
+## ⚠️ CRITICAL PRE-IMPLEMENTATION REQUIREMENTS (Added 2025-01-01)
+
+**NOTE**: The following logging requirements MUST be implemented before starting the 216-run sweep to enable Tier 4 analysis. These need to be integrated into the phases below.
+
+### Required Logging Infrastructure
+
+1. **Batch-Level Metric Logging**
+   - Create `LossSlopeLogger` callback that logs EVERY batch:
+     - `loss_train_nats` and `loss_train_bits` (bits = nats / ln(2))
+     - `acc_train`, `lr`, `wd`
+   - Without this, Tier 4 cannot compute early slopes or power law fitting
+
+2. **Quarter-Epoch Validation**
+   - Set `val_check_interval: 0.25` in trainer config
+   - Ensures validation metrics logged 4x per epoch
+   - Critical for fine-grained loss curve analysis
+
+3. **Enhanced Curvature Monitoring**
+   - Update CurvatureMonitor to use BackPACK for trace (already in dependencies)
+   - Use hessian-eigenthings for λ_max computation
+   - MUST compute every 500 steps exactly
+
+4. **Gradient/Weight Norm Tracking**
+   - Add to validation logging (every 0.25 epochs)
+   - Track `grad_norm` and `weight_norm`
+   - Essential for BN-off stability analysis
+
+5. **Noise Metrics Schedule**
+   - Configure NoiseMonitor with `log_every_n_epochs=2`
+   - Required for PSD tail, gradient variance analysis
+
+6. **Checkpoint Size Tracking**
+   - Log `checkpoint_size_mb` when saving checkpoints
+   - Update checkpoint strategy to `save_top_k=3`
+
+### Additional Critical Updates
+
+- **Resource Testing Phase**: Add cluster testing to determine optimal workers per GPU per variant
+- **Path Fix**: Training script is at root (`python train_cnn.py`), not in scripts/
+- **Dependencies**: BackPACK already added to pyproject.toml
+
+---
+
 ## Agent Instructions
 **IMPORTANT: Read these before starting implementation**
 

@@ -1,5 +1,44 @@
 # Implementation Plan: Tier 4 Analysis Suite (deconCNN)
 
+## ⚠️ ADDITIONAL CONSIDERATIONS FROM TIER 3 REVIEW (Added 2025-01-01)
+
+**NOTE**: The following items may become relevant during implementation. They were identified during Tier 3 review but are not critical for the core logging infrastructure.
+
+### Data Format Considerations
+
+1. **JSON to CSV Conversion**
+   - Tier 3 will log to dr_exp's metrics.jsonl format
+   - Tier 4 needs to implement conversion utilities for pandas analysis
+   - Example utility needed:
+     ```python
+     def convert_metrics_jsonl_to_csv(experiment_dir):
+         """Convert dr_exp metrics.jsonl to CSV for analysis."""
+     ```
+
+2. **Missing Analysis Functions**
+   - Need to implement before Phase 1:
+     - `knee_detector.py` - AIC-based knee detection
+     - `power_law_fitter.py` - Single/two-power law fitting
+     - `metric_validator.py` - Completeness checking
+   - Consider extracting from existing dr_results analysis scripts
+
+3. **Library Strategy Updates**
+   - BackPACK is being used for trace estimation (more efficient)
+   - PyHessian reserved for spectral analysis only
+   - No `hutch_nn` library exists - use PyHessian or BackPACK features
+
+4. **Dependencies Already Added**
+   - All visualization libraries (pandas, matplotlib, etc.) already in deconCNN
+   - BackPACK already added for trace estimation
+   - No need to add these again
+
+5. **Potential Resource Optimizations**
+   - Workers per GPU will be determined by Tier 3 testing
+   - May vary by experiment variant (BN-off may need fewer workers)
+   - Check Tier 3 results before assuming 3 workers per GPU
+
+---
+
 ## Agent Instructions
 **IMPORTANT: Read these before starting implementation**
 
