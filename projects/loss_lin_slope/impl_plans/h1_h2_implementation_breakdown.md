@@ -56,23 +56,7 @@ This document breaks down the implementation tasks into four tiers for testing h
 
 ## Tier 3: Hydra Configuration & Job Setup
 
-### 3.1 Experimental Grid Configuration
-- [ ] Create Hydra configs for 216 experimental runs
-- [ ] Set up config sweep files for each ablation set:
-  - S-core: ResNet-18, BN-on, width-1×, SGD
-  - S-adamw: ResNet-18, BN-on, width-1×, AdamW
-  - S-bn-off: ResNet-18, BN-off, width-1×, SGD
-  - S-narrow: ResNet-18, BN-on, width-0.5×, SGD
-
-### 3.2 Hyperparameter Sweeps
-- [ ] Configure LR grid: {0.05, 0.1, 0.2}
-- [ ] Configure WD grid: {1e-4, 1e-3, 1e-2}
-- [ ] Configure seed grid: {0, 1, 2, 3, 4, 5}
-
-### 3.3 Job Management
-- [ ] Create SLURM array job template for parallel execution
-- [ ] Set up 2 workers per GPU configuration
-- [ ] Create job monitoring scripts
+See /Users/daniellerothermel/drotherm/repos/dr_ref/projects/loss_lin_slope/top_level_planning/2025.07.03_Meeting_Prep_Plan.md to identify the set of runs that need to be executed.  This step will require planning both in terms of what runs to execute, how to locally on my mac test and verify all the necessary functionality in a way that I, the user, can see how it works and personally verify it is what I expect, and how to use the combination of /Users/daniellerothermel/drotherm/repos/deconCNN and /Users/daniellerothermel/drotherm/repos/dr_exp to execute the runs on the slurm cluster.
 
 ## Tier 4: Analysis Implementation
 
