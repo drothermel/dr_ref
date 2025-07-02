@@ -80,6 +80,9 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   # Verify dependencies
   uv run python -c "import pandas, matplotlib, statsmodels, rich; print('Dependencies OK')"
   
+  # Verify dr_exp_utils module exists and imports correctly
+  uv run python -c "from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job; print('dr_exp_utils OK')"
+  
   # Verify training script location
   ls scripts/train_cnn.py  # Should exist
   
@@ -547,16 +550,30 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Create `scripts/monitor_experiment.py`
   - Implement job status tracking using dr_exp API:
     ```python
-    # Track: jobs queued/running/completed/failed
-    from dr_exp_utils import list_decon_jobs
+    #!/usr/bin/env python
+    """Monitor deconCNN experiment progress."""
     
-    jobs = list_decon_jobs(experiment="loss_lin_slope")
-    status = {
-        'queued': sum(1 for j in jobs if j['status'] == 'queued'),
-        'running': sum(1 for j in jobs if j['status'] == 'running'),
-        'completed': sum(1 for j in jobs if j['status'] == 'completed'),
-        'failed': sum(1 for j in jobs if j['status'] == 'failed')
-    }
+    import numpy as np
+    from datetime import datetime
+    
+    from deconcnn.dr_exp_utils import list_decon_jobs
+    
+    def monitor_experiment(experiment_name: str = "loss_lin_slope"):
+        """Monitor job status for loss slope experiment."""
+        # Track: jobs queued/running/completed/failed
+        jobs = list_decon_jobs(experiment=experiment_name)
+        
+        status = {
+            'queued': sum(1 for j in jobs if j['status'] == 'queued'),
+            'running': sum(1 for j in jobs if j['status'] == 'running'),
+            'completed': sum(1 for j in jobs if j['status'] == 'completed'),
+            'failed': sum(1 for j in jobs if j['status'] == 'failed')
+        }
+        
+        print(f"Experiment: {experiment_name}")
+        print(f"Total jobs: {len(jobs)}")
+        print(f"Status breakdown: {status}")
+        return status
     ```
   - Add data quality checks:
     ```python
@@ -578,6 +595,16 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Progress reporting with ETA based on average job runtime
   - Run `lint_fix` then commit: `feat: create experiment monitoring script`
+
+### Python Script Template for All Scripts
+For consistency, all Python scripts in `scripts/` should follow this pattern:
+```python
+#!/usr/bin/env python
+"""Script description."""
+
+from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
+# ... other imports as needed
+```
 
 - [ ] **Commit 22**: Add unit tests for monitoring script
   - Create `tests/test_monitor_experiment.py`
@@ -1095,6 +1122,15 @@ To continue this implementation:
 ### **Repository Context for Each Commit:**
 - Commits 1-21: Execute in deconCNN repository (local development)
 - Commits 22-23: Execute from deconCNN on cluster (GPU required, MANUAL)
+
+### **Script Execution Pattern:**
+All Python scripts should be executed with `uv run` from repository root:
+- `uv run python scripts/monitor_experiment.py`
+- `uv run python scripts/recover_failed.py`
+- `uv run python scripts/verify_completeness.py`
+- `uv run python scripts/prepare_dataset.py`
+- `uv run python scripts/validate_local.py`
+- `uv run python scripts/test_harness.py`
 
 ## Success Metrics
 
