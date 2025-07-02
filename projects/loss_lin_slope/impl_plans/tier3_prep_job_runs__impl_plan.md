@@ -71,6 +71,12 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 
 - [ ] **Pre-Setup**: Verify environment and create necessary directories
   ```bash
+  # CRITICAL: Navigate to deconCNN repository first
+  cd /Users/daniellerothermel/drotherm/repos/deconCNN
+  
+  # Verify you're in the correct directory
+  pwd  # Should show: /Users/daniellerothermel/drotherm/repos/deconCNN
+  
   # Verify dependencies
   uv run python -c "import pandas, matplotlib, statsmodels, rich; print('Dependencies OK')"
   
