@@ -1,9 +1,7 @@
-# Tier 3 Unified Implementation Plan: Job Setup and Critical Logging Infrastructure
+# Tier 3 Implementation Plan: Job Setup and Critical Logging Infrastructure
+## Date: 2025-07-02
 
-## Date: 2025-07-01 - Updated 2025-07-02
-## Purpose: Streamlined Tier 3 implementation focused on critical path to get experiments running
-
-This document provides an atomic implementation plan that gets from 0 to running 216-job sweep in 23 focused commits, ensuring each change is testable and reversible.
+This document provides an atomic implementation plan that gets from 0 to running 216-job sweep in 31 focused commits, ensuring each change is testable and reversible with comprehensive unit testing.
 
 **Atomic commits - each commit does ONE thing well, with explicit testing phases.**
 
@@ -19,29 +17,11 @@ This document provides an atomic implementation plan that gets from 0 to running
    - **Why**: Has existing ML infrastructure, dependencies, and callback framework
    - **Work here**: 95% of implementation happens here
 
-2. **dr_ref** (`/Users/daniellerothermel/drotherm/repos/dr_ref/`)
-   - **Role**: Documentation and planning repository
-   - **Contains**: Implementation plans, architecture docs, retrospectives
-   - **Why**: Centralized knowledge base, separate from code churn
-   - **Work here**: Planning documents and cross-project documentation only
-
-3. **dr_exp** (`/Users/daniellerothermel/drotherm/repos/dr_exp/`)
+2. **dr_exp** (`/Users/daniellerothermel/drotherm/repos/dr_exp/`)
    - **Role**: Experiment tracking infrastructure
    - **Contains**: Job submission utilities, logging infrastructure
    - **Why**: Reusable experiment management across projects
-   - **Used via**: Import and integration, not direct modification
-
-### Working Directory Commands:
-
-```bash
-# For implementation work (most commands):
-cd /Users/daniellerothermel/drotherm/repos/deconCNN
-
-# For documentation updates:
-cd /Users/daniellerothermel/drotherm/repos/dr_ref
-
-# Commands in this plan assume you're in deconCNN unless specified
-```
+   - **Used via**: Already integrated in deconCNN via dr_exp_callback.py
 
 ## 🎯 CRITICAL SUCCESS FACTORS
 
@@ -76,90 +56,20 @@ cd /Users/daniellerothermel/drotherm/repos/dr_ref
 
 ## Current Status
 - Last updated: 2025-07-02
-- Last completed step: [Comprehensive review completed - findings documented below]
+- Last completed step: Plan fully reviewed
 - Active agent: [none]
 - Blocked by: [none]
-- Plan status: **Atomic structure - 23 focused commits organized in 6 phases**
-
-## 🔍 Comprehensive Review Findings (2025-07-02)
-
-### ✅ Repository Structure Verified
-- All three repositories exist exactly as documented
-- deconCNN has expected callback infrastructure with BaseMonitor pattern
-- configs/experiment/ directory empty and ready for new configs
-- Only missing: `notebooks/` directory (easy creation in Phase 0)
-
-### ⚠️ Critical Implementation Updates Needed
-
-1. **Submission Script Syntax** 
-   - Plan shows: `--sweep optim.lr=0.05,0.1,0.2`
-   - **Actual syntax**: `--param lr=0.05,0.1,0.2`
-   - All submission commands need updating
-
-2. **CurvatureMonitor Implementation**
-   - Current code does NOT use PyHessian (uses custom implementation)
-   - Already has `compute_every_n_steps=500` parameter
-   - **Decision**: Keep existing implementation, skip PyHessian refactor
-   - Memory optimization can be added to existing code
-
-3. **Existing Metric Logging**
-   - Lightning module ALREADY logs: `train_loss`, `train_loss_bits`, `train_acc`, `lr`, `wd`
-   - LossSlopeLogger should coordinate to avoid duplication
-   - Focus on adding slope calculations and periodic gradient/weight norms
-
-4. **Dr_exp Integration**
-   - Integration exists via dr_exp_callback.py and dr_exp_utils.py
-   - Need to verify exact API before implementing job generation
-   - Consider using existing submit_experiments.py for all submissions
-
-### ✅ Dependencies Confirmed
-- All required packages installed: pandas, matplotlib, statsmodels, rich
-- PyHessian installed but not needed
-- Training infrastructure fully operational
-- Hydra configuration working as expected
-
-### 📋 Implementation Recommendations
-
-1. **Simplify CurvatureMonitor updates** - Add memory params to existing implementation
-2. **Reuse existing metrics** - Don't duplicate train_loss_bits logging
-3. **Use submit_experiments.py** - May not need custom job generation
-4. **Test metric conflicts early** - Run all callbacks together in Commit 6
-
-### ⚡ Updated Commands
-
-```bash
-# Submission command (corrected syntax)
-python scripts/submit_experiments.py \
-  --config configs/experiment/loss_lin_slope_base.yaml \
-  --param lr=0.05,0.1,0.2 \
-  --param weight_decay=1e-4,1e-3,1e-2 \
-  --param seed=0,1,2,3,4,5
-
-# Test with fast_dev_run (confirmed working)
-uv run python scripts/train_cnn.py trainer.fast_dev_run=true
-```
-
-## 📋 Pre-Implementation Checklist
-
-**Complete these steps BEFORE starting Commit 1:**
-
-- [ ] Switch to deconCNN repository: `cd /Users/daniellerothermel/drotherm/repos/deconCNN`
-- [ ] Create notebooks directory: `mkdir -p notebooks`
-- [ ] Verify dependencies: `uv run python -c "import pandas, matplotlib, statsmodels, rich; print('Dependencies OK')"`
-- [ ] Test training script: `uv run python scripts/train_cnn.py trainer.fast_dev_run=true`
-- [ ] Review BaseMonitor pattern: `cat src/deconcnn/callbacks/base_monitor.py`
-- [ ] Check existing metrics: `grep -n "self.log" src/deconcnn/models/cifar_resnet.py`
-- [ ] Verify submit script syntax: `python scripts/submit_experiments.py --help`
+- Plan status: **Ready for implementation - 31 focused commits organized in 6 phases with unit tests**
 
 ## Phase 0: Pre-Implementation Setup
+
+### ⚠️ IMPORTANT: Machine Configuration for Local Testing
+When running on Mac, you MUST specify `machine=mac` for all training commands to avoid cluster-specific paths and CUDA errors. The default configuration points to cluster paths that don't exist on Mac.
 
 ### Critical Setup Requirements
 
 - [ ] **Pre-Setup**: Verify environment and create necessary directories
   ```bash
-  # Working directory: deconCNN
-  cd /Users/daniellerothermel/drotherm/repos/deconCNN
-  
   # Verify dependencies
   uv run python -c "import pandas, matplotlib, statsmodels, rich; print('Dependencies OK')"
   
@@ -167,23 +77,16 @@ uv run python scripts/train_cnn.py trainer.fast_dev_run=true
   ls scripts/train_cnn.py  # Should exist
   
   # Test basic training with fast_dev_run
-  uv run python scripts/train_cnn.py trainer.fast_dev_run=true
-  
-  # Create notebooks directory
-  mkdir -p notebooks
+  uv run python scripts/train_cnn.py machine=mac trainer.fast_dev_run=true
   ```
   - Dependencies present: pandas>=2.3.0, matplotlib>=3.10.3, statsmodels>=0.14.4, rich>=14.0.0
-  - Verify training script runs without errors
-  - Create notebooks directory for validation scripts
-  - **MUST COMPLETE**: Before any other commits
-  - Commit: `chore: verify environment and create notebooks directory`
+  - Verify training script runs without errors: `uv run python scripts/train_cnn.py machine=mac trainer.fast_dev_run=true`
+  - Review BaseMonitor pattern: `cat src/deconcnn/callbacks/base_monitor.py`
+  - Check existing metrics: `grep -n "self.log" src/deconcnn/training/lightning_module.py`
+  - Verify submit script syntax: `uv run python scripts/submit_experiments.py sweep --help`
+  - Commit: `chore: verify environment and dependencies`
 
-## Phase 1: Core Callbacks (6 commits)
-
-```bash
-# Working directory for all commits
-cd /Users/daniellerothermel/drotherm/repos/deconCNN
-```
+## Phase 1: Core Callbacks (9 commits)
 
 - [ ] **Commit 1**: Implement LossSlopeLogger callback
   - Create `src/deconcnn/callbacks/loss_slope_logger.py`
@@ -200,29 +103,78 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
                      debug_mode: bool = True):
             super().__init__(log_every_n_steps, log_epoch_freq, debug_mode)
     ```
-  - **[UPDATED]** Focus on NEW metrics only (existing metrics already logged by Lightning module):
-    - Skip: `train_loss`, `train_loss_bits`, `train_acc`, `lr`, `wd` (already logged)
-    - Add gradient and weight norm tracking every 0.25 epochs:
-      - `grad_norm_l2`: L2 norm of all gradients
-      - `weight_norm_l2`: L2 norm of all weights
+  - Focus on NEW metrics only with unique names:
+    - Use `loss_slope/` prefix for all metrics to avoid conflicts
+    - Periodic gradient and weight norm tracking (every 0.25 epochs):
+      - `loss_slope/grad_norm_periodic`: L2 norm of all gradients
+      - `loss_slope/weight_norm_periodic`: L2 norm of all weights
     - Implement slope calculation:
-      - `loss_slope_5_15`: Slope computed over epochs 5-15 using least squares
-      - `loss_slope_full`: Slope from burn-in to current epoch
+      - `loss_slope/alpha_5_15`: Slope computed over epochs 5-15 using least squares
+      - `loss_slope/alpha_full`: Slope from burn-in to current epoch
       - Store loss history internally for slope computation
   - Use existing loss values from `trainer.callback_metrics['train_loss']`
   - Use `self.pl_module.log_dict()` for logging new metrics
   - Add comprehensive docstrings explaining slope methodology
   - Commit: `feat: implement LossSlopeLogger callback`
 
-- [ ] **Commit 2**: Test LossSlopeLogger functionality
-  - Test with: `python scripts/train_cnn.py epochs=2 batch_size=32`
+- [ ] **Commit 2**: Add unit tests for LossSlopeLogger
+  - Create `tests/test_loss_slope_logger.py`
+  - Test slope calculation accuracy:
+    ```python
+    def test_slope_calculation_accuracy():
+        """Test that slope calculation matches numpy least squares"""
+        logger = LossSlopeLogger()
+        # Generate synthetic loss curve: y = 2.0 - 0.1*x + noise
+        losses = [2.0 - 0.1*x + 0.01*np.random.randn() for x in range(20)]
+        calculated_slope = logger._calculate_slope(losses, start=5, end=15)
+        reference_slope = np.polyfit(range(5, 15), losses[5:15], 1)[0]
+        assert np.abs(calculated_slope - reference_slope) < 1e-6
+    ```
+  - Test metric naming and prefixing:
+    ```python
+    def test_metric_prefixing():
+        """Ensure all metrics use loss_slope/ prefix"""
+        logger = LossSlopeLogger()
+        metrics = logger._prepare_metrics(...)
+        assert all(k.startswith('loss_slope/') for k in metrics.keys())
+    ```
+  - Test edge cases:
+    ```python
+    def test_early_epoch_handling():
+        """Test behavior before slope_window_start"""
+        logger = LossSlopeLogger(slope_window_start=5)
+        # Should not compute slope before epoch 5
+        assert logger._should_compute_slope(epoch=3) is False
+    
+    def test_nan_handling():
+        """Test graceful handling of NaN values"""
+        logger = LossSlopeLogger()
+        losses_with_nan = [1.0, np.nan, 0.8, 0.7]
+        # Should filter NaN and still compute or return None
+        slope = logger._calculate_slope(losses_with_nan)
+        assert slope is None or not np.isnan(slope)
+    ```
+  - Test gradient norm computation:
+    ```python
+    def test_gradient_norm_computation():
+        """Test gradient norm calculation"""
+        # Mock model with known gradients
+        mock_model = create_mock_model_with_gradients()
+        logger = LossSlopeLogger()
+        grad_norm = logger._compute_gradient_norm(mock_model)
+        expected_norm = np.sqrt(sum(g.norm()**2 for g in known_gradients))
+        assert np.abs(grad_norm - expected_norm) < 1e-6
+    ```
+  - Commit: `test: add unit tests for LossSlopeLogger`
+
+- [ ] **Commit 3**: Integration test LossSlopeLogger
+  - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=2 batch_size=32`
   - Verify batch-level metrics are logged correctly
   - Verify gradient norms logged every 0.25 epochs
   - Commit: `test: verify LossSlopeLogger batch and epoch logging`
 
-- [ ] **Commit 3**: Configure CurvatureMonitor settings
-  - **[UPDATED]** Keep existing implementation (no PyHessian refactor needed)
-  - Verify `compute_every_n_steps: int = 500` is already set (confirmed)
+- [ ] **Commit 4**: Configure CurvatureMonitor settings
+  - Edit `src/deconcnn/callbacks/curvature_monitor.py`
   - Add memory optimization parameters to existing implementation:
     ```python
     def __init__(self,
@@ -241,13 +193,44 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Test memory usage with different subsample ratios
   - Commit: `feat: add memory optimization to CurvatureMonitor`
 
-- [ ] **Commit 4**: Test CurvatureMonitor configuration
-  - Test with: `python scripts/train_cnn.py epochs=1 batch_size=128`
+- [ ] **Commit 5**: Add unit tests for CurvatureMonitor changes
+  - Create `tests/test_curvature_monitor.py` (or update existing)
+  - Test subsampling functionality:
+    ```python
+    def test_subsampling():
+        """Test that subsampling reduces dataset size correctly"""
+        monitor = CurvatureMonitor(subsample_ratio=0.1)
+        dataset_size = 1000
+        subsampled_size = monitor._get_subsample_size(dataset_size)
+        assert subsampled_size == 100
+    ```
+  - Test memory bounds:
+    ```python
+    def test_max_batch_size_limit():
+        """Test that batch size is limited correctly"""
+        monitor = CurvatureMonitor(max_batch_size=32)
+        original_batch_size = 128
+        limited_size = monitor._limit_batch_size(original_batch_size)
+        assert limited_size == 32
+    ```
+  - Test compute frequency:
+    ```python
+    def test_compute_frequency():
+        """Test that computation happens every N steps"""
+        monitor = CurvatureMonitor(compute_every_n_steps=500)
+        assert monitor.should_compute(global_step=499) is False
+        assert monitor.should_compute(global_step=500) is True
+        assert monitor.should_compute(global_step=501) is False
+    ```
+  - Commit: `test: add unit tests for CurvatureMonitor memory optimization`
+
+- [ ] **Commit 6**: Integration test CurvatureMonitor
+  - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=1 batch_size=128`
   - Verify metrics computed exactly every 500 steps
   - Monitor memory usage during computation
   - Commit: `test: verify CurvatureMonitor 500-step frequency`
 
-- [ ] **Commit 5**: Configure NoiseMonitor settings
+- [ ] **Commit 7**: Configure NoiseMonitor settings
   - Update NoiseMonitor configuration in callback YAML:
     ```yaml
     noise_monitor:
@@ -259,16 +242,35 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Ensure PSD tail, gradient variance use correct frequencies
   - Commit: `feat: configure NoiseMonitor and checkpoint settings`
 
-- [ ] **Commit 6**: Integration test all callbacks
+- [ ] **Commit 8**: Add unit tests for NoiseMonitor configuration
+  - Create `tests/test_noise_monitor_config.py`
+  - Test configuration loading:
+    ```python
+    def test_noise_monitor_frequency():
+        """Test NoiseMonitor computes every 2 epochs"""
+        config = load_callback_config('noise_monitor')
+        assert config['compute_every_epochs'] == 2
+        assert config['log_epoch_freq'] == 1
+    ```
+  - Test checkpoint configuration:
+    ```python
+    def test_checkpoint_save_top_k():
+        """Test checkpoint saves only top 3"""
+        trainer_config = load_trainer_defaults()
+        assert trainer_config['checkpoint']['save_top_k'] == 3
+    ```
+  - Commit: `test: add unit tests for NoiseMonitor configuration`
+
+- [ ] **Commit 9**: Integration test all callbacks
   - Test all callbacks together: LossSlopeLogger + DrExpMetricsCallback + CurvatureMonitor + NoiseMonitor
   - Verify no metric name conflicts
   - Check total memory usage
-  - Test with: `python scripts/train_cnn.py epochs=4 batch_size=32 enable_checkpointing=true`
+  - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=4 batch_size=32 enable_checkpointing=true`
   - Commit: `test: validate callback integration`
 
 ## Phase 2: Experiment Configurations (5 commits)
 
-- [ ] **Commit 7**: Create base experiment config
+- [ ] **Commit 10**: Create base experiment config
   - Create `configs/experiment/loss_lin_slope_base.yaml`:
     ```yaml
     defaults:
@@ -281,7 +283,7 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
           loss_slope_logger,  # New callback
           dr_exp_metrics
         ]
-      - /machine: cluster
+      - /machine: cluster  # Override with machine=mac for local testing
     
     # Experimental design parameters
     seed: ???  # Required override
@@ -313,13 +315,13 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
     ```
   - Commit: `feat: create base experiment configuration`
 
-- [ ] **Commit 8**: Test base configuration
+- [ ] **Commit 11**: Test base configuration
   - Load and validate config structure
-  - Run 1 epoch test: `python scripts/train_cnn.py +experiment=loss_lin_slope_base epochs=1`
+  - Run 1 epoch test: `uv run python scripts/train_cnn.py machine=mac +experiment=loss_lin_slope_base epochs=1 seed=0 optim.lr=0.1 optim.weight_decay=1e-4`
   - Verify validation runs 4 times per epoch
   - Commit: `test: verify base experiment configuration`
 
-- [ ] **Commit 9**: Create BN-off variant
+- [ ] **Commit 12**: Create BN-off variant
   - Create `configs/experiment/loss_lin_slope_bn_off.yaml`:
     ```yaml
     defaults:
@@ -333,7 +335,7 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
     ```
   - Commit: `feat: create BN-off experiment variant`
 
-- [ ] **Commit 10**: Create narrow and AdamW variants
+- [ ] **Commit 13**: Create narrow and AdamW variants
   - Create `configs/experiment/loss_lin_slope_narrow.yaml`:
     ```yaml
     defaults:
@@ -355,27 +357,104 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
     ```
   - Commit: `feat: create narrow and AdamW variants`
 
-- [ ] **Commit 11**: Create unified callback config
+- [ ] **Commit 14**: Create unified callback config
   - Create `configs/callbacks/loss_lin_slope_metrics.yaml`
   - Consolidate all callback settings in one place
   - Update experiment configs to reference it
   - Commit: `feat: create unified callback configuration`
 
-## Phase 3: Local Validation (3 commits)
+## Phase 3: Local Validation (5 commits)
 
-- [ ] **Commit 12**: Create validation script
+- [ ] **Commit 15**: Create validation script
   - Create `scripts/validate_local.py`
   - Quick 3-epoch test for single configuration
+  - Include machine=mac parameter for local testing
   - Check output formats and logging
+  - Example command in script:
+    ```python
+    cmd = [
+        "uv", "run", "python", "scripts/train_cnn.py",
+        "machine=mac",  # Critical for Mac testing
+        "+experiment=loss_lin_slope_base",
+        "epochs=3",
+        "seed=0",
+        "optim.lr=0.1",
+        "optim.weight_decay=1e-4"
+    ]
+    ```
   - Commit: `feat: create local validation script`
 
-- [ ] **Commit 13**: Create test harness
+- [ ] **Commit 16**: Add unit tests for validation script
+  - Create `tests/test_validate_local.py`
+  - Test configuration validation:
+    ```python
+    def test_validate_config_structure():
+        """Test that config validation catches missing keys"""
+        config = {"epochs": 3}  # Missing required keys
+        validator = LocalValidator()
+        with pytest.raises(ValueError, match="Missing required"):
+            validator.validate_config(config)
+    ```
+  - Test output format checking:
+    ```python
+    def test_validate_output_format():
+        """Test output format validation"""
+        outputs = {"loss": [1.0, 0.9], "accuracy": [0.5, 0.6]}
+        validator = LocalValidator()
+        assert validator.check_output_format(outputs) is True
+    ```
+  - Test metric presence validation:
+    ```python
+    def test_required_metrics_present():
+        """Test that all required metrics are logged"""
+        required = ["loss_slope/alpha_5_15", "loss_slope/grad_norm_periodic"]
+        logged = {"loss_slope/alpha_5_15": 0.1, "other": 0.2}
+        validator = LocalValidator()
+        missing = validator.find_missing_metrics(required, logged)
+        assert "loss_slope/grad_norm_periodic" in missing
+    ```
+  - Commit: `test: add unit tests for validation script`
+
+- [ ] **Commit 17**: Create test harness
   - Create `scripts/test_harness.py`
-  - Test all 4 variants sequentially
+  - Test all 4 variants sequentially with machine=mac
   - Report pass/fail for each
   - Commit: `feat: create test harness for all variants`
 
-- [ ] **Commit 14**: Create validation notebook and unit tests
+- [ ] **Commit 18**: Add unit tests for test harness
+  - Create `tests/test_test_harness.py`
+  - Test variant loading:
+    ```python
+    def test_load_all_variants():
+        """Test that all 4 variants can be loaded"""
+        harness = TestHarness()
+        variants = harness.get_variants()
+        assert len(variants) == 4
+        assert set(variants) == {"base", "bn_off", "narrow", "adamw"}
+    ```
+  - Test failure detection:
+    ```python
+    def test_detect_training_failure():
+        """Test that training failures are detected"""
+        harness = TestHarness()
+        result = {"status": "failed", "error": "OOM"}
+        assert harness.is_failure(result) is True
+    ```
+  - Test report generation:
+    ```python
+    def test_generate_report():
+        """Test report generation with mixed results"""
+        results = {
+            "base": {"status": "success"},
+            "bn_off": {"status": "failed", "error": "gradient explosion"}
+        }
+        harness = TestHarness()
+        report = harness.generate_report(results)
+        assert "1/2 variants failed" in report
+    ```
+  - Commit: `test: add unit tests for test harness`
+
+- [ ] **Commit 19**: Create validation notebook and comprehensive tests
   - Create `notebooks/validate_metrics_basic.ipynb`
   - Add unit tests for LossSlopeLogger in `tests/test_loss_slope_logger.py`:
     ```python
@@ -413,100 +492,64 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
     - NO-GO if: Missing metrics OR wrong frequencies OR poor fits OR data corruption
   - Commit: `feat: create metric validation notebook and unit tests`
 
-## Phase 4: Job Management (4 commits)
+## Phase 4: Job Management (5 commits)
 
-- [ ] **Commit 15**: Create job generation script
-  - **[UPDATED]** Consider if needed - submit_experiments.py may handle everything
-  - If needed, create `scripts/generate_jobs.py`
-  - Use existing dr_exp infrastructure:
-    ```python
-    from dr_exp_utils import submit_job_to_dr_exp
-    
-    GRID = {
-        'variants': ['base', 'bn_off', 'narrow', 'adamw'],
-        'learning_rates': [0.05, 0.1, 0.2],
-        'weight_decays': [1e-4, 1e-3, 1e-2],
-        'seeds': [0, 1, 2, 3, 4, 5]
-    }
-    # Total: 4 × 3 × 3 × 6 = 216 jobs
-    ```
-  - Implement priority assignment:
-    ```python
-    def get_priority(variant, lr, wd, seed):
-        base_priority = 100
-        if lr == 0.1:  # Default LR
-            base_priority += 50
-        if wd == 1e-4:  # Default WD
-            base_priority += 25
-        if seed == 0:  # First seed
-            base_priority += 10
-        return base_priority
-    ```
-  - Generate and submit jobs using dr_exp format:
-    ```python
-    for variant in GRID['variants']:
-        for lr in GRID['learning_rates']:
-            for wd in GRID['weight_decays']:
-                for seed in GRID['seeds']:
-                    job_config = {
-                        "experiment": f"loss_lin_slope_{variant}",
-                        "config_overrides": {
-                            "seed": seed,
-                            "optim.lr": lr,
-                            "optim.weight_decay": wd
-                        },
-                        "priority": get_priority(variant, lr, wd, seed),
-                        "tags": [f"lr{lr}", f"wd{wd}", variant]
-                    }
-                    submit_job_to_dr_exp(job_config)
-    ```
-  - Commit: `feat: create job generation script`
-
-- [ ] **Commit 16**: Create submission wrapper
-  - **[UPDATED]** Use existing `scripts/submit_experiments.py` with correct syntax:
-    ```bash
-    # Submit all jobs for base variant
-    python scripts/submit_experiments.py \
-      --config configs/experiment/loss_lin_slope_base.yaml \
-      --param lr=0.05,0.1,0.2 \
-      --param weight_decay=1e-4,1e-3,1e-2 \
-      --param seed=0,1,2,3,4,5
-    
-    # Repeat for other variants
-    python scripts/submit_experiments.py \
-      --config configs/experiment/loss_lin_slope_bn_off.yaml \
-      --param lr=0.05,0.1,0.2 \
-      --param weight_decay=1e-4,1e-3,1e-2 \
-      --param seed=0,1,2,3,4,5
-    ```
-  - Alternative: Create wrapper script `scripts/submit_all_loss_slope.sh`:
+- [ ] **Commit 20**: Create submission wrapper script
+  - Create `scripts/submit_all_loss_slope.sh`:
     ```bash
     #!/bin/bash
     # Submit all 216 jobs using existing infrastructure
     
+    # Configuration
     VARIANTS="base bn_off narrow adamw"
     LRS="0.05,0.1,0.2"
     WDS="1e-4,1e-3,1e-2"
     SEEDS="0,1,2,3,4,5"
     
+    # Submit jobs for each variant
     for variant in $VARIANTS; do
-        echo "Submitting $variant variant..."
-        python scripts/submit_experiments.py \
-          --config configs/experiment/loss_lin_slope_${variant}.yaml \
+        echo "Submitting $variant variant (54 jobs)..."
+        uv run python scripts/submit_experiments.py sweep \
+          configs/experiment/loss_lin_slope_${variant}.yaml \
           --param lr=$LRS \
           --param weight_decay=$WDS \
           --param seed=$SEEDS \
-          --tags loss_lin_slope,$variant
+          --experiment loss_lin_slope \
+          --priority 100
+        
+        # Add small delay to avoid overwhelming the system
+        sleep 2
     done
+    
+    echo "All 216 jobs submitted!"
     ```
-  - Commit: `feat: create submission wrapper using existing infrastructure`
+  - Make script executable: `chmod +x scripts/submit_all_loss_slope.sh`
+  - Test with dry run first:
+    ```bash
+    # Modify script temporarily to add --dry-run flag
+    uv run python scripts/submit_experiments.py sweep \
+      configs/experiment/loss_lin_slope_base.yaml \
+      --param lr=0.05,0.1,0.2 \
+      --param weight_decay=1e-4,1e-3,1e-2 \
+      --param seed=0,1,2,3,4,5 \
+      --dry-run
+    ```
+  - Commit: `feat: create submission wrapper for 216-job sweep`
 
-- [ ] **Commit 17**: Create monitoring script
+- [ ] **Commit 21**: Create monitoring script
   - Create `scripts/monitor_experiment.py`
   - Implement job status tracking using dr_exp API:
     ```python
     # Track: jobs queued/running/completed/failed
-    status = dr_exp.get_experiment_status("loss_lin_slope")
+    from dr_exp_utils import list_decon_jobs
+    
+    jobs = list_decon_jobs(experiment="loss_lin_slope")
+    status = {
+        'queued': sum(1 for j in jobs if j['status'] == 'queued'),
+        'running': sum(1 for j in jobs if j['status'] == 'running'),
+        'completed': sum(1 for j in jobs if j['status'] == 'completed'),
+        'failed': sum(1 for j in jobs if j['status'] == 'failed')
+    }
     ```
   - Add data quality checks:
     ```python
@@ -529,28 +572,148 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Progress reporting with ETA based on average job runtime
   - Commit: `feat: create experiment monitoring script`
 
-- [ ] **Commit 18**: Create failure recovery script
+- [ ] **Commit 22**: Add unit tests for monitoring script
+  - Create `tests/test_monitor_experiment.py`
+  - Test job status tracking:
+    ```python
+    def test_job_status_counting():
+        """Test correct counting of job statuses"""
+        mock_jobs = [
+            {"status": "completed"}, {"status": "running"},
+            {"status": "completed"}, {"status": "failed"}
+        ]
+        monitor = ExperimentMonitor()
+        status = monitor.count_statuses(mock_jobs)
+        assert status["completed"] == 2
+        assert status["running"] == 1
+        assert status["failed"] == 1
+    ```
+  - Test data quality checks:
+    ```python
+    def test_quality_check_loss_range():
+        """Test loss range validation"""
+        monitor = ExperimentMonitor()
+        assert monitor.check_loss_range(2.5) is True  # Valid
+        assert monitor.check_loss_range(15.0) is False  # Too high
+        assert monitor.check_loss_range(-1.0) is False  # Negative
+    ```
+  - Test alert conditions:
+    ```python
+    def test_high_failure_rate_alert():
+        """Test failure rate alert trigger"""
+        monitor = ExperimentMonitor()
+        status = {"total": 100, "failed": 15}
+        assert monitor.should_alert_failure_rate(status) is True
+        
+        status = {"total": 100, "failed": 5}
+        assert monitor.should_alert_failure_rate(status) is False
+    ```
+  - Test ETA calculation:
+    ```python
+    def test_eta_calculation():
+        """Test ETA calculation based on completed jobs"""
+        monitor = ExperimentMonitor()
+        completed_times = [300, 320, 310]  # seconds
+        remaining_jobs = 10
+        eta = monitor.calculate_eta(completed_times, remaining_jobs)
+        assert 3000 < eta < 3300  # ~10 jobs * ~310 seconds
+    ```
+  - Commit: `test: add unit tests for experiment monitoring`
+
+- [ ] **Commit 23**: Create failure recovery script
   - Create `scripts/recover_failed.py`
   - Detect OOM, timeout, gradient explosion
   - Implement retry logic with parameter adjustment
   - Create `docs/operational_runbook_basic.md`
   - Commit: `feat: create failure recovery system`
 
-## Phase 5: Data Pipeline (3 commits)
+- [ ] **Commit 24**: Add unit tests for failure recovery
+  - Create `tests/test_recover_failed.py`
+  - Test failure detection:
+    ```python
+    def test_detect_oom_failure():
+        """Test OOM detection from error logs"""
+        recovery = FailureRecovery()
+        error_log = "RuntimeError: CUDA out of memory"
+        failure_type = recovery.detect_failure_type(error_log)
+        assert failure_type == "OOM"
+    ```
+  - Test parameter adjustment logic:
+    ```python
+    def test_adjust_params_for_oom():
+        """Test parameter adjustment for OOM failures"""
+        recovery = FailureRecovery()
+        original_params = {"batch_size": 128, "workers": 4}
+        adjusted = recovery.adjust_for_oom(original_params)
+        assert adjusted["batch_size"] == 64  # Halved
+        assert adjusted["workers"] == 2  # Reduced
+    ```
+  - Test retry decision logic:
+    ```python
+    def test_should_retry_decision():
+        """Test retry decision based on failure type"""
+        recovery = FailureRecovery()
+        assert recovery.should_retry("OOM", attempts=1) is True
+        assert recovery.should_retry("OOM", attempts=4) is False  # Max 3
+        assert recovery.should_retry("unknown", attempts=1) is False
+    ```
+  - Test runbook generation:
+    ```python
+    def test_generate_runbook_entry():
+        """Test operational runbook entry generation"""
+        recovery = FailureRecovery()
+        failure = {
+            "job_id": "123", 
+            "error": "OOM",
+            "action": "reduce batch size"
+        }
+        entry = recovery.generate_runbook_entry(failure)
+        assert "job_id: 123" in entry
+        assert "Action taken: reduce batch size" in entry
+    ```
+  - Commit: `test: add unit tests for failure recovery`
 
-- [ ] **Commit 19**: Create collection script
+## Phase 5: Data Pipeline (5 commits)
+
+- [ ] **Commit 25**: Create collection script
   - Create `scripts/collect_and_archive.sh`
   - Gather results from scratch directory
   - Organize by experiment variant
   - Commit: `feat: create result collection script`
 
-- [ ] **Commit 20**: Create verification script
+- [ ] **Commit 26**: Create verification script
   - Create `scripts/verify_completeness.py`
   - Check all 216 runs completed
   - Report missing or failed runs
   - Commit: `feat: create completeness verification script`
 
-- [ ] **Commit 21**: Create export script
+- [ ] **Commit 27**: Add unit tests for verification script
+  - Create `tests/test_verify_completeness.py`
+  - Test completeness checking:
+    ```python
+    def test_find_missing_runs():
+        """Test detection of missing runs"""
+        verifier = CompletenessVerifier()
+        expected = [(lr, wd, seed) for lr in [0.05, 0.1] 
+                    for wd in [1e-4] for seed in [0, 1]]
+        actual = [(0.05, 1e-4, 0), (0.1, 1e-4, 1)]  # Missing one
+        missing = verifier.find_missing(expected, actual)
+        assert len(missing) == 1
+        assert (0.05, 1e-4, 1) in missing
+    ```
+  - Test report generation:
+    ```python
+    def test_completeness_report():
+        """Test completeness report generation"""
+        verifier = CompletenessVerifier()
+        results = {"completed": 214, "failed": 2, "missing": 0}
+        report = verifier.generate_report(results)
+        assert "214/216 runs completed" in report
+        assert "2 runs failed" in report
+    ```
+  - Commit: `test: add unit tests for completeness verification`
+
+- [ ] **Commit 28**: Create export script
   - Create `scripts/prepare_dataset.py`
   - Define output columns for Tier 4 analysis:
     ```python
@@ -594,11 +757,47 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Include data dictionary documenting each column
   - Commit: `feat: create dataset export script`
 
+- [ ] **Commit 29**: Add unit tests for export script
+  - Create `tests/test_prepare_dataset.py`
+  - Test schema validation:
+    ```python
+    def test_validate_output_schema():
+        """Test that output schema matches expected columns"""
+        exporter = DatasetExporter()
+        data = {"run_id": "123", "lr": 0.1}  # Missing required columns
+        with pytest.raises(ValueError, match="Missing required columns"):
+            exporter.validate_schema(data)
+    ```
+  - Test data type conversion:
+    ```python
+    def test_convert_data_types():
+        """Test proper data type conversion"""
+        exporter = DatasetExporter()
+        raw_data = {"lr": "0.1", "seed": "42", "r_squared": "0.98"}
+        converted = exporter.convert_types(raw_data)
+        assert isinstance(converted["lr"], float)
+        assert isinstance(converted["seed"], int)
+        assert converted["r_squared"] == 0.98
+    ```
+  - Test parquet export:
+    ```python
+    def test_export_to_parquet():
+        """Test parquet file generation"""
+        exporter = DatasetExporter()
+        test_data = [{"run_id": "1", "lr": 0.1, "seed": 0}]
+        output_path = exporter.export_parquet(test_data, "test.parquet")
+        assert output_path.exists()
+        # Verify can be read back
+        df = pd.read_parquet(output_path)
+        assert len(df) == 1
+    ```
+  - Commit: `test: add unit tests for dataset export`
+
 ## Phase 6: Cluster Execution (2 commits - MANUAL EXECUTION)
 
 **Note: These commits require cluster access and will be executed manually**
 
-- [ ] **Commit 22**: Resource testing (MANUAL)
+- [ ] **Commit 30**: Resource testing (MANUAL)
   - Create `scripts/test_resource_configs.py`
   - Define expected resource profiles:
     ```python
@@ -625,22 +824,27 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Document optimal workers per variant in commit message
   - Commit: `test: determine resource allocation on cluster`
 
-- [ ] **Commit 23**: Execute experiment sweep (MANUAL)
-  - Run submission with determined worker counts:
+- [ ] **Commit 31**: Execute experiment sweep (MANUAL)
+  - Run submission using wrapper script:
     ```bash
-    # Submit jobs by variant with optimal workers
-    python scripts/submit_loss_lin_slope.py --variant base --workers 3
-    python scripts/submit_loss_lin_slope.py --variant bn_off --workers 2
-    python scripts/submit_loss_lin_slope.py --variant narrow --workers 4
-    python scripts/submit_loss_lin_slope.py --variant adamw --workers 2
+    # Submit all 216 jobs
+    ./scripts/submit_all_loss_slope.sh
+    
+    # Or submit individually if needed for resource management:
+    uv run python scripts/submit_experiments.py sweep \
+      configs/experiment/loss_lin_slope_base.yaml \
+      --param lr=0.05,0.1,0.2 \
+      --param weight_decay=1e-4,1e-3,1e-2 \
+      --param seed=0,1,2,3,4,5 \
+      --experiment loss_lin_slope
     ```
   - Monitor execution:
     ```bash
     # Real-time monitoring
-    watch -n 30 "python scripts/monitor_experiment.py"
+    watch -n 30 "uv run python scripts/monitor_experiment.py"
     
     # Check for failures
-    dr_exp --experiment loss_lin_slope list --status failed
+    uv run python scripts/monitor_experiment.py --show-failed
     ```
   - Expected timeline: ~12 hours on 24 GPUs
   - Collect results using `scripts/collect_and_archive.sh`
@@ -705,13 +909,13 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 - [ ] Note: ResNet width_mult confirmed working (scales channels, min 8)
 
 ### Validation Checkpoints:
-- [ ] **Commit 6**: All callbacks work together without conflicts
-- [ ] **Commit 8**: Base experiment config loads without errors
-- [ ] **Commit 11**: All 4 variants configured correctly
-- [ ] **Commit 14**: Metric validation notebook confirms proper logging formats
-- [ ] **Commit 21**: All scripts created and tested locally
-- [ ] **Commit 22**: Resource testing prevents OOMs on cluster
-- [ ] **Commit 23**: 216-job sweep successfully submitted and completed
+- [ ] **Commit 9**: All callbacks work together without conflicts
+- [ ] **Commit 11**: Base experiment config loads without errors
+- [ ] **Commit 14**: All 4 variants configured correctly
+- [ ] **Commit 19**: Metric validation notebook confirms proper logging formats
+- [ ] **Commit 29**: All scripts created and tested locally
+- [ ] **Commit 30**: Resource testing prevents OOMs on cluster
+- [ ] **Commit 31**: 216-job sweep successfully submitted and completed
 
 ### Pre-submission Checklist:
 - [ ] LossSlopeLogger logs every batch with nats and bits
@@ -749,13 +953,14 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 
 ### Critical Paths:
 - **Working directory**: `/Users/daniellerothermel/drotherm/repos/deconCNN`
-- **Training script**: `scripts/train_cnn.py` (verified location)
+- **Training script**: `scripts/train_cnn.py`
+- **Submission script**: `scripts/submit_experiments.py sweep`
 - **Callback configs**: `configs/callbacks/`
-- **Experiment configs**: `configs/experiment/` (already created)
+- **Experiment configs**: `configs/experiment/` (empty, ready for new configs)
 - **SLURM account**: CDS
 - **Scratch path**: `/scratch/ddr8143/`
 - **Container**: Singularity with overlay at `/scratch/work/public/singularity/`
-- **dr_exp integration**: Via imports from dr_exp package
+- **dr_exp integration**: Already complete via dr_exp_callback.py
 
 ### Experimental Design:
 - **Hyperparameter Grid**: 
@@ -774,7 +979,7 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 - **✅ Created**: configs/experiment directory, src/deconcnn/analysis directory
 - **✅ Dependencies**: pandas, matplotlib, statsmodels, rich installed
 - **✅ Callbacks**: CurvatureMonitor has compute_every_n_steps=500
-- **❌ Missing**: LossSlopeLogger, notebooks directory
+- **❌ Missing**: LossSlopeLogger
 - **🔄 Updated**: All paths reference deconCNN repository
 
 ## Risk Mitigations
@@ -785,22 +990,19 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 4. **Incomplete Runs**: Recovery script with adaptive strategies
 5. **Analysis Gaps**: Ensure proper data formatting for Tier 4
 6. **Callback Conflicts**: Test all callbacks together before cluster deployment
-7. **PyHessian Memory**: Use mini-batch settings to control memory usage
+7. **CurvatureMonitor Memory**: Use subsampling to control memory usage
 8. **Experiment Failure Risk**: Automated failure recovery prevents job loss during 216-job execution
 9. **Data Corruption Risk**: Real-time data quality monitoring prevents wasted compute on corrupted experiments
 
 ## Handoff Instructions
 
 To continue this implementation:
-1. **FIRST**: Read the "Comprehensive Review Findings" section for critical updates
-2. `cd /Users/daniellerothermel/drotherm/repos/deconCNN`
-3. Complete the "Pre-Implementation Checklist" section
-4. Read the full plan including repository architecture
-5. Check "Current Status" section for latest progress
-6. Use TodoWrite to plan your session
-7. Find first unchecked [ ] item (start with Commit 1)
-8. Implement with quality gates (lint_fix before every commit)
-9. Update "Current Status" section when stopping
+1. Complete the "Pre-Implementation Checklist" section
+2. Check "Current Status" section for latest progress
+3. Use TodoWrite to plan your session
+4. Find first unchecked [ ] item (start with Phase 0 pre-setup)
+5. Implement with quality gates (lint_fix before every commit)
+6. Update "Current Status" section when stopping
 
 ### **CRITICAL DEPENDENCIES:**
 - Phase 0 → Commit 1 (environment must be verified first)
