@@ -76,10 +76,80 @@ cd /Users/daniellerothermel/drotherm/repos/dr_ref
 
 ## Current Status
 - Last updated: 2025-07-02
-- Last completed step: [Comprehensive review and plan update completed]
+- Last completed step: [Comprehensive review completed - findings documented below]
 - Active agent: [none]
 - Blocked by: [none]
 - Plan status: **Atomic structure - 23 focused commits organized in 6 phases**
+
+## 🔍 Comprehensive Review Findings (2025-07-02)
+
+### ✅ Repository Structure Verified
+- All three repositories exist exactly as documented
+- deconCNN has expected callback infrastructure with BaseMonitor pattern
+- configs/experiment/ directory empty and ready for new configs
+- Only missing: `notebooks/` directory (easy creation in Phase 0)
+
+### ⚠️ Critical Implementation Updates Needed
+
+1. **Submission Script Syntax** 
+   - Plan shows: `--sweep optim.lr=0.05,0.1,0.2`
+   - **Actual syntax**: `--param lr=0.05,0.1,0.2`
+   - All submission commands need updating
+
+2. **CurvatureMonitor Implementation**
+   - Current code does NOT use PyHessian (uses custom implementation)
+   - Already has `compute_every_n_steps=500` parameter
+   - **Decision**: Keep existing implementation, skip PyHessian refactor
+   - Memory optimization can be added to existing code
+
+3. **Existing Metric Logging**
+   - Lightning module ALREADY logs: `train_loss`, `train_loss_bits`, `train_acc`, `lr`, `wd`
+   - LossSlopeLogger should coordinate to avoid duplication
+   - Focus on adding slope calculations and periodic gradient/weight norms
+
+4. **Dr_exp Integration**
+   - Integration exists via dr_exp_callback.py and dr_exp_utils.py
+   - Need to verify exact API before implementing job generation
+   - Consider using existing submit_experiments.py for all submissions
+
+### ✅ Dependencies Confirmed
+- All required packages installed: pandas, matplotlib, statsmodels, rich
+- PyHessian installed but not needed
+- Training infrastructure fully operational
+- Hydra configuration working as expected
+
+### 📋 Implementation Recommendations
+
+1. **Simplify CurvatureMonitor updates** - Add memory params to existing implementation
+2. **Reuse existing metrics** - Don't duplicate train_loss_bits logging
+3. **Use submit_experiments.py** - May not need custom job generation
+4. **Test metric conflicts early** - Run all callbacks together in Commit 6
+
+### ⚡ Updated Commands
+
+```bash
+# Submission command (corrected syntax)
+python scripts/submit_experiments.py \
+  --config configs/experiment/loss_lin_slope_base.yaml \
+  --param lr=0.05,0.1,0.2 \
+  --param weight_decay=1e-4,1e-3,1e-2 \
+  --param seed=0,1,2,3,4,5
+
+# Test with fast_dev_run (confirmed working)
+uv run python scripts/train_cnn.py trainer.fast_dev_run=true
+```
+
+## 📋 Pre-Implementation Checklist
+
+**Complete these steps BEFORE starting Commit 1:**
+
+- [ ] Switch to deconCNN repository: `cd /Users/daniellerothermel/drotherm/repos/deconCNN`
+- [ ] Create notebooks directory: `mkdir -p notebooks`
+- [ ] Verify dependencies: `uv run python -c "import pandas, matplotlib, statsmodels, rich; print('Dependencies OK')"`
+- [ ] Test training script: `uv run python scripts/train_cnn.py trainer.fast_dev_run=true`
+- [ ] Review BaseMonitor pattern: `cat src/deconcnn/callbacks/base_monitor.py`
+- [ ] Check existing metrics: `grep -n "self.log" src/deconcnn/models/cifar_resnet.py`
+- [ ] Verify submit script syntax: `python scripts/submit_experiments.py --help`
 
 ## Phase 0: Pre-Implementation Setup
 
@@ -130,19 +200,17 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
                      debug_mode: bool = True):
             super().__init__(log_every_n_steps, log_epoch_freq, debug_mode)
     ```
-  - Implement batch-level logging for:
-    - `loss_train_nats`: Raw loss in nats
-    - `loss_train_bits`: loss_train_nats / ln(2)
-    - `acc_train`: Training accuracy
-    - `lr`: Current learning rate
-    - `wd`: Weight decay value
-  - Add gradient and weight norm tracking every 0.25 epochs:
-    - `grad_norm_l2`: L2 norm of gradients
-    - `weight_norm_l2`: L2 norm of weights
-  - Implement slope calculation:
-    - `loss_slope_5_15`: Slope computed over epochs 5-15 using least squares
-    - `loss_slope_full`: Slope from burn-in to current epoch
-  - Use `self.pl_module.log_dict()` for logging
+  - **[UPDATED]** Focus on NEW metrics only (existing metrics already logged by Lightning module):
+    - Skip: `train_loss`, `train_loss_bits`, `train_acc`, `lr`, `wd` (already logged)
+    - Add gradient and weight norm tracking every 0.25 epochs:
+      - `grad_norm_l2`: L2 norm of all gradients
+      - `weight_norm_l2`: L2 norm of all weights
+    - Implement slope calculation:
+      - `loss_slope_5_15`: Slope computed over epochs 5-15 using least squares
+      - `loss_slope_full`: Slope from burn-in to current epoch
+      - Store loss history internally for slope computation
+  - Use existing loss values from `trainer.callback_metrics['train_loss']`
+  - Use `self.pl_module.log_dict()` for logging new metrics
   - Add comprehensive docstrings explaining slope methodology
   - Commit: `feat: implement LossSlopeLogger callback`
 
@@ -153,25 +221,25 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Commit: `test: verify LossSlopeLogger batch and epoch logging`
 
 - [ ] **Commit 3**: Configure CurvatureMonitor settings
-  - Update `src/deconcnn/callbacks/curvature_monitor.py`
-  - Add memory parameters to `__init__`:
+  - **[UPDATED]** Keep existing implementation (no PyHessian refactor needed)
+  - Verify `compute_every_n_steps: int = 500` is already set (confirmed)
+  - Add memory optimization parameters to existing implementation:
     ```python
     def __init__(self,
                  compute_every_n_steps: int = 500,
-                 mini_hessian_batch_size: int = 32,
-                 hessian_batch_size: int = 1,
+                 subsample_ratio: float = 0.1,  # Sample 10% of data for Hessian
+                 max_batch_size: int = 32,      # Limit batch size for memory
                  ...):
     ```
-  - Modify compute_curvature method with PyHessian settings:
+  - Update compute method to use subsampling:
     ```python
-    hessian_comp = hessian(model, loss_func, dataloader,
-                          mini_hessian_batch_size=self.mini_hessian_batch_size,
-                          hessian_batch_size=self.hessian_batch_size)
-    trace = hessian_comp.trace(maxIter=100, tol=1e-3)
+    # Subsample data for memory efficiency
+    n_samples = int(len(dataloader.dataset) * self.subsample_ratio)
+    indices = torch.randperm(len(dataloader.dataset))[:n_samples]
     ```
   - Add docstring with memory usage tips and expected compute times
-  - Expected memory reduction: ~50% with mini_batch_size=32
-  - Commit: `feat: configure CurvatureMonitor memory settings`
+  - Test memory usage with different subsample ratios
+  - Commit: `feat: add memory optimization to CurvatureMonitor`
 
 - [ ] **Commit 4**: Test CurvatureMonitor configuration
   - Test with: `python scripts/train_cnn.py epochs=1 batch_size=128`
@@ -348,7 +416,8 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 ## Phase 4: Job Management (4 commits)
 
 - [ ] **Commit 15**: Create job generation script
-  - Create `scripts/generate_jobs.py`
+  - **[UPDATED]** Consider if needed - submit_experiments.py may handle everything
+  - If needed, create `scripts/generate_jobs.py`
   - Use existing dr_exp infrastructure:
     ```python
     from dr_exp_utils import submit_job_to_dr_exp
@@ -394,21 +463,21 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
   - Commit: `feat: create job generation script`
 
 - [ ] **Commit 16**: Create submission wrapper
-  - Use existing `scripts/submit_experiments.py` script:
+  - **[UPDATED]** Use existing `scripts/submit_experiments.py` with correct syntax:
     ```bash
     # Submit all jobs for base variant
     python scripts/submit_experiments.py \
       --config configs/experiment/loss_lin_slope_base.yaml \
-      --sweep optim.lr=0.05,0.1,0.2 \
-             optim.weight_decay=1e-4,1e-3,1e-2 \
-             seed=0,1,2,3,4,5
+      --param lr=0.05,0.1,0.2 \
+      --param weight_decay=1e-4,1e-3,1e-2 \
+      --param seed=0,1,2,3,4,5
     
     # Repeat for other variants
     python scripts/submit_experiments.py \
       --config configs/experiment/loss_lin_slope_bn_off.yaml \
-      --sweep optim.lr=0.05,0.1,0.2 \
-             optim.weight_decay=1e-4,1e-3,1e-2 \
-             seed=0,1,2,3,4,5
+      --param lr=0.05,0.1,0.2 \
+      --param weight_decay=1e-4,1e-3,1e-2 \
+      --param seed=0,1,2,3,4,5
     ```
   - Alternative: Create wrapper script `scripts/submit_all_loss_slope.sh`:
     ```bash
@@ -424,9 +493,9 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
         echo "Submitting $variant variant..."
         python scripts/submit_experiments.py \
           --config configs/experiment/loss_lin_slope_${variant}.yaml \
-          --sweep optim.lr=$LRS \
-                 optim.weight_decay=$WDS \
-                 seed=$SEEDS \
+          --param lr=$LRS \
+          --param weight_decay=$WDS \
+          --param seed=$SEEDS \
           --tags loss_lin_slope,$variant
     done
     ```
@@ -628,12 +697,12 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 ## Critical Validation Checkpoints
 
 ### **REQUIRED BEFORE STARTING:**
-- [ ] Complete Phase 0 pre-setup
-- [ ] Switch to deconCNN repository as working directory
-- [ ] Verify configs/experiment directory exists
-- [ ] Test dr_exp submission with dummy job
-- [ ] Understand existing callback patterns from BaseMonitor
-- [ ] Review ResNet model width_mult implementation
+- [ ] Complete Pre-Implementation Checklist above
+- [ ] Complete Phase 0 pre-setup 
+- [ ] Understand key findings from Comprehensive Review section
+- [ ] Note: configs/experiment directory exists but is empty (ready for use)
+- [ ] Note: BaseMonitor pattern is straightforward (log_every_n_steps, should_log methods)
+- [ ] Note: ResNet width_mult confirmed working (scales channels, min 8)
 
 ### Validation Checkpoints:
 - [ ] **Commit 6**: All callbacks work together without conflicts
@@ -723,14 +792,15 @@ cd /Users/daniellerothermel/drotherm/repos/deconCNN
 ## Handoff Instructions
 
 To continue this implementation:
-1. **FIRST**: `cd /Users/daniellerothermel/drotherm/repos/deconCNN`
-2. Complete pre-implementation checklist below
-3. Read the full plan including repository architecture
-4. Check "Current Status" section
-5. Use TodoWrite to plan your session
-6. Find first unchecked [ ] item (start with Commit 1)
-7. Implement with quality gates
-8. Update status when stopping
+1. **FIRST**: Read the "Comprehensive Review Findings" section for critical updates
+2. `cd /Users/daniellerothermel/drotherm/repos/deconCNN`
+3. Complete the "Pre-Implementation Checklist" section
+4. Read the full plan including repository architecture
+5. Check "Current Status" section for latest progress
+6. Use TodoWrite to plan your session
+7. Find first unchecked [ ] item (start with Commit 1)
+8. Implement with quality gates (lint_fix before every commit)
+9. Update "Current Status" section when stopping
 
 ### **CRITICAL DEPENDENCIES:**
 - Phase 0 → Commit 1 (environment must be verified first)
