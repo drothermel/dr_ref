@@ -67,201 +67,56 @@
 - Active agent: ready for implementation
 - Blocked by: none
 
-### Phase 1: Enhanced Mathematical Functions (4 commits)
+### [x] Phase 1: Enhanced Mathematical Functions (4 commits)
 - [x] **Commit 1**: Add AIC computation to utils ✅ COMPLETED
 - [x] **Commit 2**: Implement exponential fitting
 - [x] **Commit 3**: Implement Welch's method for spectral analysis ✅ COMPLETED
 - [x] **Commit 4**: Add noise floor detection ✅ COMPLETED
 
-### Phase 2: Detection & Analysis Functions (6 commits)
-
-- TODO: verify that the training code outputs CSV
-
+### [x] Phase 2: Detection & Analysis Functions (6 commits)
 - [x] **Commit 5**: Implement knee detection
 - [x] **Commit 6**: Implement windowed slope analysis
 - [x] **Commit 7**: Implement segmented power law fitting
+- [x] **Commit 8**: Implement Hutch++ algorithm - IN PROGRESS
+- [x] **Commit 9**: Implement plateau detection
+- [x] **Commit 10**: Add statistical utilities
 
-- [ ] **Commit 8**: Implement Hutch++ algorithm - IN PROGRESS
-  - Progress: see /Users/daniellerothermel/drotherm/repos/deconCNN/hutchpp_algorithm_reference.md
-  - [ ] Create `src/deconcnn/analysis/curvature.py`
-  - [ ] Add module structure
-  - [ ] Add `hutchpp_trace()` function
-  - [ ] Improve on Hutchinson estimator
-  - [ ] Include variance reduction
-  - [ ] Create `tests/test_curvature.py`
-  - [ ] Compare with Hutchinson baseline
-  - [ ] Verify variance reduction
-  - **Commit**: `feat and test: implement Hutch++ trace estimator`
+### [x] Phase 3: Primary Analysis Scripts (6 commits)
+- [x] **Commit 11**: Implement loss mosaic visualization
+- [x] **Commit 12**: Create knee detection script
+- [x] **Commit 13**: Create slope analysis script
+- [x] **Commit 14**: Create model comparison script
+- [x] **Commit 15**: Test primary analysis scripts
+- [x] **Commit 16**: Add progress tracking to scripts
 
-- [ ] **Commit 9**: Implement plateau detection
-  - [ ] Add `lambda_plateau_epoch()` function
-  - [ ] Use statistical change detection
-  - [ ] Return plateau start epoch
-  - [ ] unit Test with synthetic eigenvalue trajectories
-  - [ ] Verify detection accuracy
-  - **Commit**: `feat and test: implement eigenvalue plateau detection`
-  
-- [ ] **Commit 10**: Add statistical utilities
-  - [ ] Add correlation functions to `utils.py`
-  - [ ] Include Pearson, Spearman, partial
-  - [ ] Add bootstrap confidence intervals
-  - [ ] Unit Test correlation functions
-  - [ ] Unit Test confidence intervals
-  - [ ] Unit Test edge cases
-  - **Commit**: `feat: add statistical correlation utilities`
+### [x] Phase 4: Supporting Analysis Scripts (5 commits)
+- [x] **Commit 17**: Create architecture ablation script
+- [x] **Commit 18**: Create hyperparameter heatmap script
+- [x] **Commit 19**: Create noise correlation script
+- [x] **Commit 20**: Create curvature timing script
+- [x] **Commit 21**: Integration test supporting scripts
 
-### Phase 3: Primary Analysis Scripts (6 commits)
+### [x] Phase 5: Slide Generation Notebooks (13 commits)
+- [x] **Commit 22**: Create H1 hypothesis notebook
+- [x] **Commit 23**: Create H2 hypothesis notebook
+- [x] **Commit 24**: Add interactivity to primary notebooks
+- [x] **Commit 25**: Create model comparison notebook
+- [x] **Commit 26**: Create window robustness notebook
+- [x] **Commit 27**: Create architecture ablation notebook
+- [x] **Commit 28**: Create curvature exploration notebook
+- [x] **Commit 29**: Add export functionality to notebooks
+- [x] **Commit 30**: Create notebook utilities
+- [x] **Commit 31**: Create integration test suite
+- [x] **Commit 32**: Expand operational documentation
+- [x] **Commit 33**: Create analysis library README
 
-- [ ] **Commit 11**: Implement loss mosaic visualization
-  - [ ] Create `src/deconcnn/analysis/visualization.py`
-  - [ ] Add basic imports and module structure
-  - [ ] Add `plot_loss_mosaic()` function
-  - [ ] Support 6-panel layout (train/val × 3 scales)
-  - [ ] Add automatic scaling and labeling
-  - **Commit**: `feat: implement loss mosaic visualization`
+# After Runs Complete (Manual) 
 
-- [ ] **Commit 12**: Create knee detection script
-  - [ ] Create `scripts/analysis/A-knee.py`
-  - [ ] Use click CLI interface
-  - [ ] Process all runs and detect burn-in
-  - **Commit**: `feat: create knee detection analysis script`
-
-- [ ] **Commit 13**: Create slope analysis script
-  - [ ] Create `scripts/analysis/A-slope.py`
-  - [ ] Compute α_early (5-15) and α_full
-  - [ ] Export results to CSV
-  - **Commit**: `feat: create slope analysis script`
-
-- [ ] **Commit 14**: Create model comparison script
-  - [ ] Create `scripts/analysis/A-fits.py`
-  - [ ] Compare exponential/power/two-power models
-  - [ ] Generate AIC comparison table
-  - **Commit**: `feat: create model comparison script`
-
-- [ ] **Commit 15**: Test primary analysis scripts
-  - [ ] Create test data subset
-  - [ ] Run all three scripts
-  - [ ] Verify output formats
-  - **Commit**: `test: verify primary analysis scripts`
-
-- [ ] **Commit 16**: Add progress tracking to scripts
-  - [ ] Add rich progress bars
-  - [ ] Add error recovery on failure
-  - [ ] Add logging for debugging
-  - **Commit**: `feat: add progress tracking to analysis scripts`
-
-### Phase 4: Supporting Analysis Scripts (5 commits)
-
-- [ ] **Commit 17**: Create architecture ablation script
-  - [ ] Create `scripts/analysis/A-optim_arch.py`
-  - [ ] Generate ablation comparison table
-  - [ ] Include effect sizes
-  - **Commit**: `feat: create architecture ablation analysis`
-
-- [ ] **Commit 18**: Create hyperparameter heatmap script
-  - [ ] Create `scripts/analysis/A-grid_heat.py`
-  - [ ] Generate LR×WD performance heatmap
-  - [ ] Add statistical significance
-  - **Commit**: `feat: create hyperparameter heatmap analysis`
-
-- [ ] **Commit 19**: Create noise correlation script
-  - [ ] Create `scripts/analysis/A-noise_corr.py`
-  - [ ] Compute noise proxy correlations
-  - [ ] Add confidence intervals
-  - **Commit**: `feat: create noise correlation analysis`
-
-- [ ] **Commit 20**: Create curvature timing script
-  - [ ] Create `scripts/analysis/A-curvature_timing.py`
-  - [ ] Analyze λ₁ plateau vs α knee timing
-  - [ ] Include statistical tests
-  - **Commit**: `feat: create curvature timing analysis`
-
-- [ ] **Commit 21**: Integration test supporting scripts
-  - [ ] Run all supporting scripts
-  - [ ] Verify outputs compatible
-  - [ ] Check performance
-  - **Commit**: `test: verify supporting analysis scripts`
-
-### Phase 5: Slide Generation Notebooks (13 commits)
-
-- [ ] **Commit 22**: Create H1 hypothesis notebook
-  - [ ] Create `notebooks/h1_primary.ipynb`
-  - [ ] Add to `.gitignore`: `notebooks/*.ipynb_checkpoints`, `*.png`, `*.pdf`, `*.svg`
-  - [ ] Add R² histogram visualization
-  - [ ] Add loss mosaic for best/worst fits
-  - **Commit**: `feat: create H1 hypothesis notebook`
-
-- [ ] **Commit 23**: Create H2 hypothesis notebook
-  - [ ] Create `notebooks/h2_primary.ipynb`
-  - [ ] Add α_early vs best_val_CE scatter
-  - [ ] Include correlation statistics
-  - **Commit**: `feat: create H2 hypothesis notebook`
-
-- [ ] **Commit 24**: Add interactivity to primary notebooks
-  - [ ] Add plotly interactive plots
-  - [ ] Add parameter selection widgets
-  - [ ] Test interactivity
-  - **Commit**: `feat: add interactivity to hypothesis notebooks`
-
-- [ ] **Commit 25**: Create model comparison notebook
-  - [ ] Create `notebooks/backup_b_fam.ipynb`
-  - [ ] Add AIC comparison visualizations
-  - [ ] Include model selection analysis
-  - **Commit**: `feat: create model comparison notebook`
-
-- [ ] **Commit 26**: Create window robustness notebook
-  - [ ] Create `notebooks/backup_c_window.ipynb`
-  - [ ] Add robustness heatmaps
-  - [ ] Include sensitivity analysis
-  - **Commit**: `feat: create window robustness notebook`
-
-- [ ] **Commit 27**: Create architecture ablation notebook
-  - [ ] Create `notebooks/backup_h_arch.ipynb`
-  - [ ] Add ablation result tables
-  - [ ] Include statistical comparisons
-  - **Commit**: `feat: create architecture ablation notebook`
-
-- [ ] **Commit 28**: Create curvature exploration notebook
-  - [ ] Create `notebooks/curvature_explore.ipynb`
-  - [ ] Add eigenvalue trajectory plots
-  - [ ] Include plateau analysis
-  - **Commit**: `feat: create curvature exploration notebook`
-
-- [ ] **Commit 29**: Add export functionality to notebooks
-  - [ ] Add PNG/PDF export for all plots
-  - [ ] Add LaTeX table export
-  - [ ] Test export quality
-  - **Commit**: `feat: add export functionality to notebooks`
-
-- [ ] **Commit 30**: Create notebook utilities
-  - [ ] Create `notebooks/utils.py`
-  - [ ] Add common plotting functions
-  - [ ] Add data loading helpers
-  - **Commit**: `feat: create notebook utility functions`
-
-- [ ] **Commit 31**: Test all notebooks
+- [ ] **Commit 1**: Test all notebooks
   - [ ] Run all notebooks end-to-end
   - [ ] Verify outputs and exports
   - [ ] Check narrative flow
   - **Commit**: `test: verify all analysis notebooks`
-
-- [ ] **Commit 32**: Create integration test suite
-  - [ ] Create `tests/test_integration.py`
-  - [ ] Add end-to-end pipeline tests
-  - [ ] Include synthetic data generation
-  - **Commit**: `test: create integration test suite`
-
-- [ ] **Commit 33**: Expand operational documentation
-  - [ ] Expand `docs/operational_runbook_basic.md`
-  - [ ] Add troubleshooting scenarios
-  - [ ] Include performance tips
-  - **Commit**: `docs: expand operational runbook`
-
-- [ ] **Commit 34**: Create analysis library README
-  - [ ] Create `src/deconcnn/analysis/README.md`
-  - [ ] Add API documentation
-  - [ ] Include usage examples
-  - **Commit**: `docs: create analysis library documentation`
 
 ## Technical Guidelines
 
