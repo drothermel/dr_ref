@@ -1,7 +1,6 @@
-Critical Issues Found:
+# Critical Issues Found
 
 1. Incomplete Unit Test Structure
-
 - Several test commits create test files but don't specify if they should use pytest fixtures, mocking strategies, or how to handle
 PyTorch/Lightning components
 - No guidance on mocking the Lightning trainer for unit tests
@@ -17,29 +16,23 @@ PyTorch/Lightning components
 - What if the existing callbacks don't follow expected patterns?
 - No fallback if dependencies are missing
 
-4. Slope Calculation Implementation Details
-
-- The plan mentions "using least squares" but doesn't show the actual implementation
-- Should it use numpy.polyfit, scipy, or statsmodels?
-- How to handle edge cases like insufficient data points?
-
-5. Script Execution Context
+4. Script Execution Context
 
 - Shell scripts don't specify working directory requirements
 - Python scripts don't show shebang lines or how they find imports
 
-7. Missing Validation Steps
+5. Missing Validation Steps
 
 - No verification that dr_exp is properly configured before submitting jobs
 - No check that SLURM paths exist before manual execution
 - No validation of singularity/container availability
 
-8. Data Export Ambiguity
+6. Data Export Ambiguity
 
 - The CSV export shows column definitions but not how to extract these metrics from experiment outputs
 - Where do R² values come from? Need to calculate or extract?
 
-9. Recovery Script Assumptions
+7. Recovery Script Assumptions
 
 - The failure recovery script assumes certain error message formats
 - No guidance on where error logs are stored or how to access them

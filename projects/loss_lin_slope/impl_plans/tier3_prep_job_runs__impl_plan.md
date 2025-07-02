@@ -1,7 +1,9 @@
 # Tier 3 Implementation Plan: Job Setup and Critical Logging Infrastructure
 ## Date: 2025-07-02
 
-This document provides an atomic implementation plan that gets from 0 to running 216-job sweep in 31 focused commits, ensuring each change is testable and reversible with comprehensive unit testing.
+This document provides an atomic implementation plan that gets from 0 to running 216-job sweep in 29 focused commits, ensuring each change is testable and reversible with comprehensive unit testing.
+
+**Streamlined approach**: Extract existing implementations from NoiseMonitor and CurvatureMonitor into library modules FIRST, then create new callbacks using the library. This avoids duplicate code and ensures consistency from the start.
 
 **Atomic commits - each commit does ONE thing well, with explicit testing phases.**
 
@@ -96,53 +98,452 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Verify submit script syntax: `uv run python scripts/submit_experiments.py sweep --help`
   - Run `lint_fix` then commit: `chore: verify environment and dependencies`
 
-## Phase 1: Core Callbacks (9 commits)
+## Phase 1: Library Extraction & Refactoring (5 commits)
 
-- [ ] **Commit 1**: Implement LossSlopeLogger callback
-  - Create `src/deconcnn/callbacks/loss_slope_logger.py`
-  - Inherit from BaseMonitor (see existing callbacks for pattern)
-  - Key implementation structure:
+**Strategy**: Extract existing implementations from NoiseMonitor and CurvatureMonitor into library modules first, then create new callbacks using the library. This avoids duplicate implementations and ensures consistency from the start.
+
+- [ ] **Commit 1**: Extract analysis functions from NoiseMonitor and create library
+  - Create `src/deconcnn/analysis/__init__.py` (empty with docstring)
+  - Create `src/deconcnn/analysis/utils.py` and extract EWMA from NoiseMonitor:
+    ```python
+    import numpy as np
+    from typing import Tuple
+    
+    def ewma_update(current_value: float, 
+                    running_mean: float, 
+                    running_var: float, 
+                    alpha: float = 0.1) -> Tuple[float, float]:
+        """Update exponential weighted moving average.
+        
+        Extracted from NoiseMonitor lines 67-72.
+        """
+        new_mean = alpha * current_value + (1 - alpha) * running_mean
+        diff = current_value - running_mean
+        new_var = alpha * (diff ** 2) + (1 - alpha) * running_var
+        return float(new_mean), float(new_var)
+    ```
+  - Create `src/deconcnn/analysis/fitting.py` and extract power law fitting:
+    ```python
+    import numpy as np
+    from typing import Tuple
+    
+    def fit_power_law(x: np.ndarray, y: np.ndarray) -> Tuple[float, float, float]:
+        """Fit power law y = a * x^b using log-log linear regression.
+        
+        Extracted from NoiseMonitor lines 102-107.
+        """
+        mask = (x > 0) & (y > 0)
+        if np.sum(mask) < 2:
+            return np.nan, np.nan, 0.0
+            
+        log_x = np.log(x[mask])
+        log_y = np.log(y[mask])
+        
+        coeffs = np.polyfit(log_x, log_y, deg=1)
+        slope, log_intercept = coeffs
+        
+        # Calculate R²
+        y_pred = np.polyval(coeffs, log_x)
+        ss_res = np.sum((log_y - y_pred) ** 2)
+        ss_tot = np.sum((log_y - np.mean(log_y)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+        
+        return float(slope), float(log_intercept), float(r_squared)
+    ```
+  - Create `src/deconcnn/analysis/spectral.py` and extract PSD analysis:
+    ```python
+    import numpy as np
+    from typing import Dict, Tuple
+    
+    def compute_psd_metrics(signal: np.ndarray, 
+                          low_freq_range: Tuple[float, float] = (0.1, 0.3),
+                          high_freq_range: Tuple[float, float] = (0.3, 0.5)) -> Dict[str, float]:
+        """Compute power spectral density metrics.
+        
+        Extracted from NoiseMonitor lines 114-131.
+        """
+        if len(signal) < 4:
+            return {'psd_tail': np.nan, 'total_power': np.nan}
+            
+        signal = signal - np.mean(signal)
+        window = np.hanning(len(signal))
+        signal = signal * window
+        
+        fft = np.fft.rfft(signal)
+        psd = np.abs(fft) ** 2
+        freqs = np.fft.rfftfreq(len(signal))
+        
+        low_mask = (freqs >= low_freq_range[0]) & (freqs <= low_freq_range[1])
+        high_mask = (freqs >= high_freq_range[0]) & (freqs <= high_freq_range[1])
+        
+        low_power = np.sum(psd[low_mask])
+        high_power = np.sum(psd[high_mask])
+        
+        psd_tail = high_power / (low_power + 1e-10)
+        total_power = np.sum(psd)
+        
+        return {
+            'psd_tail': float(psd_tail),
+            'total_power': float(total_power)
+        }
+    ```
+  - Immediately refactor NoiseMonitor to use these library functions:
+    - Replace EWMA implementation with `from deconcnn.analysis.utils import ewma_update`
+    - Replace power law fitting with `from deconcnn.analysis.fitting import fit_power_law`
+    - Replace PSD computation with `from deconcnn.analysis.spectral import compute_psd_metrics`
+  - Create comprehensive tests in `tests/test_analysis_utils.py`, `tests/test_analysis_fitting.py`, and `tests/test_analysis_spectral.py`
+  - Run `lint_fix` then commit: `refactor: extract NoiseMonitor functions to analysis library`
+
+- [ ] **Commit 2**: Extract Hutchinson trace from CurvatureMonitor
+  - Create `src/deconcnn/analysis/curvature.py` and extract Hutchinson trace:
     ```python
     import torch
+    from typing import Tuple, List
     import numpy as np
+    
+    def hutchinson_trace(model: torch.nn.Module, 
+                        loss_fn: callable,
+                        data_batch: torch.Tensor,
+                        target_batch: torch.Tensor,
+                        num_samples: int = 50) -> float:
+        """Estimate Hessian trace using Hutchinson's method.
+        
+        Extracted from CurvatureMonitor lines 63-121.
+        """
+        trace_estimates = []
+        
+        for _ in range(num_samples):
+            # Rademacher random vector
+            z = torch.randint_like(
+                torch.randn(sum(p.numel() for p in model.parameters())), 
+                low=0, high=2, dtype=torch.float32
+            ) * 2 - 1
+            
+            # Compute loss and gradients
+            loss = loss_fn(model(data_batch), target_batch)
+            grads = torch.autograd.grad(loss, model.parameters(), create_graph=True)
+            
+            # Flatten and compute Hessian-vector product
+            grad_vec = torch.cat([g.flatten() for g in grads])
+            hz = torch.autograd.grad(grad_vec, model.parameters(), z, retain_graph=True)
+            hz_flat = torch.cat([h.flatten() for h in hz])
+            
+            # Compute z^T H z
+            trace_estimates.append(torch.dot(z, hz_flat).item())
+            
+        return float(np.mean(trace_estimates))
+    ```
+  - Immediately refactor CurvatureMonitor to use library function:
+    - Replace Hutchinson implementation with `from deconcnn.analysis.curvature import hutchinson_trace`
+    - Update method calls to use the library function
+  - Create tests in `tests/test_analysis_curvature.py`:
+    ```python
+    def test_hutchinson_trace_estimation():
+        """Test Hutchinson trace against known matrices."""
+        # Create simple quadratic loss with known Hessian
+        model = SimpleQuadraticModel()
+        # Test that trace estimation is accurate
+        estimated_trace = hutchinson_trace(model, loss_fn, data, targets)
+        assert abs(estimated_trace - true_trace) < 0.1 * true_trace
+    ```
+  - Run `lint_fix` then commit: `refactor: extract CurvatureMonitor functions to analysis library`
+
+- [ ] **Commit 3**: Create slope calculation in library
+  - Add to `src/deconcnn/analysis/utils.py`:
+    ```python
+    def calculate_slope(losses: Dict[int, List[float]], 
+                       start: int = 5, 
+                       end: int = 15) -> Optional[float]:
+        """Calculate slope of loss curve using least squares.
+        
+        Args:
+            losses: Dictionary mapping epoch to list of batch losses
+            start: Start epoch for slope calculation (inclusive)
+            end: End epoch for slope calculation (exclusive)
+            
+        Returns:
+            Slope value or None if insufficient data
+        """
+        epochs = []
+        mean_losses = []
+        
+        for epoch in range(start, min(end, max(losses.keys()) + 1)):
+            if epoch in losses and len(losses[epoch]) > 0:
+                epochs.append(epoch)
+                mean_losses.append(np.mean(losses[epoch]))
+        
+        if len(epochs) < 2:
+            return None
+            
+        coeffs = np.polyfit(epochs, mean_losses, deg=1)
+        return float(coeffs[0])
+    ```
+  - Add comprehensive tests to `tests/test_analysis_utils.py`:
+    ```python
+    def test_slope_calculation_synthetic():
+        """Test slope calculation with known linear function."""
+        # Generate y = 2.0 - 0.1*x
+        losses = {i: [2.0 - 0.1*i + 0.01*np.random.randn() for _ in range(10)] 
+                  for i in range(20)}
+        
+        slope = calculate_slope(losses, start=5, end=15)
+        assert slope is not None
+        assert abs(slope - (-0.1)) < 0.01
+    
+    def test_slope_insufficient_data():
+        """Test handling of insufficient data."""
+        losses = {0: [1.0], 1: [0.9]}
+        slope = calculate_slope(losses, start=5, end=15)
+        assert slope is None
+    ```
+  - Run `lint_fix` then commit: `feat: add slope calculation to analysis library`
+
+- [ ] **Commit 4**: Add AIC computation to library
+  - Add to `src/deconcnn/analysis/utils.py`:
+    ```python
+    def compute_aic(y_true: np.ndarray, y_pred: np.ndarray, k: int, 
+                    use_correction: bool = False) -> float:
+        """
+        Compute Akaike Information Criterion (AIC) for model comparison.
+        
+        For least squares regression with normally distributed errors:
+        AIC = n*log(MSE) + 2k + n + n*log(2π)
+        
+        Since constant terms don't affect model comparison, we use:
+        AIC = n*log(MSE) + 2k
+        
+        Args:
+            y_true: True values (n,)
+            y_pred: Predicted values (n,) 
+            k: Number of parameters (including variance)
+            use_correction: If True, use AICc for small samples
+            
+        Returns:
+            AIC value (lower is better)
+            
+        Notes:
+            - k should include all estimated parameters including variance
+            - For linear regression: k = num_features + 1 (intercept) + 1 (variance)
+            - AICc correction recommended when n/k < 40
+        """
+        n = len(y_true)
+        assert n == len(y_pred), f"Shape mismatch: {n} vs {len(y_pred)}"
+        assert n > k, f"Sample size ({n}) must exceed parameters ({k})"
+        
+        # Calculate residual sum of squares and MSE
+        residuals = y_true - y_pred
+        rss = np.sum(residuals**2)
+        mse = rss / n
+        
+        # Prevent log(0) issues
+        if mse <= 0:
+            raise ValueError(f"Invalid MSE: {mse}. Check predictions.")
+            
+        # Basic AIC
+        aic = n * np.log(mse) + 2 * k
+        
+        # Apply small sample correction if requested
+        if use_correction and n - k - 1 > 0:
+            correction = (2 * k * (k + 1)) / (n - k - 1)
+            aic += correction
+            
+        return aic
+    
+    def compute_aic_weights(aic_values: List[float]) -> np.ndarray:
+        """
+        Compute Akaike weights for model comparison.
+        
+        Args:
+            aic_values: List of AIC values from competing models
+            
+        Returns:
+            Array of weights (sum to 1) indicating relative model probability
+        """
+        aic_values = np.array(aic_values)
+        delta_aic = aic_values - np.min(aic_values)
+        rel_likelihood = np.exp(-0.5 * delta_aic)
+        weights = rel_likelihood / np.sum(rel_likelihood)
+        return weights
+    ```
+  - Add comprehensive tests to `tests/test_analysis_utils.py`:
+    ```python
+    def test_compute_aic_basic():
+        """Test AIC computation with known values."""
+        # Perfect fit case
+        y_true = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y_pred = y_true.copy()
+        k = 2  # Simple model with 2 parameters
+        
+        # AIC should handle near-zero MSE gracefully
+        with pytest.raises(ValueError, match="Invalid MSE"):
+            compute_aic(y_true, y_pred, k)
+        
+        # Add small noise to avoid zero MSE
+        y_pred_noisy = y_pred + 1e-10
+        aic = compute_aic(y_true, y_pred_noisy, k)
+        assert aic < 0  # Very good fit should have negative AIC
+        
+    def test_compute_aic_linear_regression():
+        """Test AIC against statsmodels reference."""
+        # Generate synthetic data
+        np.random.seed(42)
+        n = 100
+        X = np.random.randn(n, 3)
+        true_coef = np.array([1.5, -2.0, 0.5])
+        y = X @ true_coef + 0.1 * np.random.randn(n)
+        
+        # Fit with sklearn
+        from sklearn.linear_model import LinearRegression
+        lr = LinearRegression()
+        lr.fit(X, y)
+        y_pred = lr.predict(X)
+        
+        # Calculate AIC manually
+        k = X.shape[1] + 1 + 1  # features + intercept + variance
+        aic_manual = compute_aic(y, y_pred, k)
+        
+        # Compare with statsmodels (should be close but not exact due to constants)
+        import statsmodels.api as sm
+        X_sm = sm.add_constant(X)
+        model = sm.OLS(y, X_sm).fit()
+        
+        # The difference should be constant across models
+        # We're mainly checking the implementation is reasonable
+        assert abs(aic_manual - model.aic) < 1000  # Generous bound for constant diff
+        
+    def test_compute_aic_model_comparison():
+        """Test AIC for model selection."""
+        np.random.seed(42)
+        n = 50
+        x = np.linspace(0, 10, n)
+        y_true = 2 * x + 1 + np.random.randn(n)
+        
+        # Model 1: Underfit (constant only)
+        y_pred1 = np.full_like(y_true, np.mean(y_true))
+        aic1 = compute_aic(y_true, y_pred1, k=2)
+        
+        # Model 2: Good fit (linear)
+        coef = np.polyfit(x, y_true, 1)
+        y_pred2 = np.polyval(coef, x)
+        aic2 = compute_aic(y_true, y_pred2, k=3)
+        
+        # Model 3: Overfit (high degree polynomial)
+        coef = np.polyfit(x, y_true, 10)
+        y_pred3 = np.polyval(coef, x)
+        aic3 = compute_aic(y_true, y_pred3, k=12)
+        
+        # Linear model should have lowest AIC
+        assert aic2 < aic1  # Better than underfit
+        assert aic2 < aic3  # Better than overfit (due to penalty)
+        
+    def test_compute_aic_weights():
+        """Test Akaike weight computation."""
+        # Three models with different AICs
+        aic_values = [100, 102, 110]  # Clear winner, close second, poor third
+        weights = compute_aic_weights(aic_values)
+        
+        # Check weights sum to 1
+        assert abs(np.sum(weights) - 1.0) < 1e-10
+        
+        # Check relative ordering
+        assert weights[0] > weights[1] > weights[2]
+        
+        # Check specific values using delta AIC formula
+        delta = np.array(aic_values) - min(aic_values)
+        expected = np.exp(-0.5 * delta)
+        expected /= expected.sum()
+        np.testing.assert_allclose(weights, expected)
+        
+    def test_compute_aic_edge_cases():
+        """Test edge cases and error handling."""
+        y = np.array([1, 2, 3, 4, 5])
+        
+        # Test shape mismatch
+        with pytest.raises(AssertionError, match="Shape mismatch"):
+            compute_aic(y, y[:-1], k=2)
+            
+        # Test too many parameters
+        with pytest.raises(AssertionError, match="Sample size.*must exceed"):
+            compute_aic(y, y, k=10)
+            
+        # Test AICc correction
+        y_pred = y + 0.1 * np.random.randn(len(y))
+        aic_base = compute_aic(y, y_pred, k=3, use_correction=False)
+        aic_corrected = compute_aic(y, y_pred, k=3, use_correction=True)
+        assert aic_corrected > aic_base  # Correction adds penalty
+    ```
+  - Add necessary imports at top of utils.py:
+    ```python
+    from typing import List
+    import numpy as np
+    ```
+  - Run tests and ensure all pass
+  - Run `lint_fix` then commit: `feat: add AIC computation to analysis library`
+
+- [ ] **Commit 5**: Integration test extracted functions
+  - Run training with original callbacks to capture baseline metrics
+  - Run training with refactored callbacks using library functions
+  - Compare outputs to ensure identical behavior:
+    ```python
+    def test_noise_monitor_refactoring():
+        """Verify NoiseMonitor produces same results after refactoring."""
+        # Run with original implementation
+        original_metrics = run_training_with_original_callbacks()
+        
+        # Run with refactored implementation
+        refactored_metrics = run_training_with_refactored_callbacks()
+        
+        # Compare key metrics
+        for key in ['psd_tail', 'power_law_slope', 'grad_var']:
+            assert np.allclose(original_metrics[key], refactored_metrics[key])
+    ```
+  - Verify CurvatureMonitor still computes every 500 steps
+  - Verify NoiseMonitor still computes every 2 epochs
+  - Run `lint_fix` then commit: `test: verify callback refactoring maintains behavior`
+
+## Phase 2: Create New Callback (2 commits)
+
+- [ ] **Commit 6**: Create LossSlopeLogger using library
+  - Create `src/deconcnn/callbacks/loss_slope_logger.py`:
+    ```python
+    import torch
+    from typing import Dict, List
     from .base_monitor import BaseMonitor
+    from deconcnn.analysis.utils import calculate_slope
     
     class LossSlopeLogger(BaseMonitor):
+        """Log loss curve slopes and periodic gradient/weight norms."""
+        
         def __init__(self, 
                      log_every_n_steps: int = 1,
                      log_epoch_freq: int = 1,
-                     burn_in_epochs: int = 5,
                      slope_window_start: int = 5,
                      slope_window_end: int = 15,
                      debug_mode: bool = True):
             super().__init__(log_every_n_steps, log_epoch_freq, debug_mode)
-            self.burn_in_epochs = burn_in_epochs
             self.slope_window_start = slope_window_start
             self.slope_window_end = slope_window_end
-            self.epoch_losses = {}  # Store losses by epoch for slope calculation
+            self.epoch_losses: Dict[int, List[float]] = {}
             
         def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
             """Log metrics every batch and quarter epoch."""
-            # Access loss from callback_metrics (following lightning_module.py:150 pattern)
             train_loss = trainer.callback_metrics.get("train_loss", None)
             if train_loss is None:
                 return
-            
-            # Convert tensor to float if needed
+                
             if isinstance(train_loss, torch.Tensor):
                 train_loss = train_loss.item()
-            
+                
             # Store for slope calculation
             current_epoch = trainer.current_epoch
             if current_epoch not in self.epoch_losses:
                 self.epoch_losses[current_epoch] = []
             self.epoch_losses[current_epoch].append(train_loss)
             
-            # Quarter-epoch periodic logging (following gradient_monitor.py:45-47 pattern)
+            # Quarter-epoch periodic logging
             total_batches = len(trainer.train_dataloader)
             quarter_epoch_interval = max(1, total_batches // 4)
             if batch_idx % quarter_epoch_interval == 0:
-                # Compute and log periodic norms
                 grad_norm = self._compute_gradient_norm(pl_module)
                 weight_norm = self._compute_weight_norm(pl_module)
                 
@@ -154,8 +555,8 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         def on_train_epoch_end(self, trainer, pl_module):
             """Calculate and log slope metrics at epoch end."""
             if trainer.current_epoch >= self.slope_window_start:
-                # Calculate slopes using stored loss history
-                alpha_early = self._calculate_slope(
+                # Use library function for slope calculation
+                alpha_early = calculate_slope(
                     self.epoch_losses, 
                     start=self.slope_window_start, 
                     end=min(self.slope_window_end, trainer.current_epoch + 1)
@@ -163,209 +564,33 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
                 if alpha_early is not None:
                     pl_module.log("loss_slope/alpha_5_15", alpha_early)
     ```
-  - Focus on NEW metrics only with unique names:
-    - Use `loss_slope/` prefix for all metrics to avoid conflicts
-    - Periodic gradient and weight norm tracking (every 0.25 epochs)
-    - Implement slope calculation using numpy.polyfit for least squares
-  - Add comprehensive docstrings explaining slope methodology
-  - Run `lint_fix` then commit: `feat: implement LossSlopeLogger callback`
-
-- [ ] **Commit 2**: Add unit tests for LossSlopeLogger
-  - Create `tests/test_loss_slope_logger.py`
-  - Test slope calculation accuracy:
+  - Create comprehensive unit tests in same commit:
     ```python
-    def test_slope_calculation_accuracy():
-        """Test that slope calculation matches numpy least squares"""
+    # tests/test_loss_slope_logger.py
+    def test_slope_logger_uses_library():
+        """Test that LossSlopeLogger correctly uses library functions."""
         logger = LossSlopeLogger()
-        # Generate synthetic loss curve: y = 2.0 - 0.1*x + noise
-        losses = [2.0 - 0.1*x + 0.01*np.random.randn() for x in range(20)]
-        calculated_slope = logger._calculate_slope(losses, start=5, end=15)
-        reference_slope = np.polyfit(range(5, 15), losses[5:15], 1)[0]
-        assert np.abs(calculated_slope - reference_slope) < 1e-6
+        # Test that it calls calculate_slope from library
+        # Test metric naming and prefixing
+        # Test edge cases
     ```
-  - Test Lightning integration with mocking:
-    ```python
-    from unittest.mock import Mock
-    import torch
-    
-    def test_metric_access_from_callback_metrics():
-        """Test accessing metrics from trainer.callback_metrics"""
-        # Mock trainer with callback_metrics
-        mock_trainer = Mock()
-        mock_trainer.callback_metrics = {"train_loss": torch.tensor(2.3)}
-        mock_trainer.current_epoch = 5
-        mock_trainer.train_dataloader = [None] * 100  # Mock 100 batches
-        
-        # Mock pl_module
-        mock_pl_module = Mock()
-        logged_metrics = {}
-        mock_pl_module.log_dict = lambda x, **kwargs: logged_metrics.update(x)
-        
-        # Test the callback
-        logger = LossSlopeLogger()
-        logger.on_train_batch_end(mock_trainer, mock_pl_module, None, None, 25)
-        
-        # Verify it stored the loss
-        assert 5 in logger.epoch_losses
-        assert 2.3 in logger.epoch_losses[5]
-        
-        # Verify quarter-epoch metrics were logged (25 is 1/4 of 100)
-        assert "loss_slope/grad_norm_periodic" in logged_metrics
-        assert "loss_slope/weight_norm_periodic" in logged_metrics
-    ```
-  - Test metric naming and prefixing:
-    ```python
-    def test_metric_prefixing():
-        """Ensure all metrics use loss_slope/ prefix"""
-        mock_trainer = Mock()
-        mock_pl_module = Mock()
-        logged_metrics = {}
-        mock_pl_module.log = lambda k, v, **kwargs: logged_metrics.update({k: v})
-        mock_pl_module.log_dict = lambda x, **kwargs: logged_metrics.update(x)
-        
-        logger = LossSlopeLogger()
-        # Simulate various callback methods
-        # ... test code ...
-        
-        assert all(k.startswith('loss_slope/') for k in logged_metrics.keys())
-    ```
-  - Test edge cases:
-    ```python
-    def test_early_epoch_handling():
-        """Test behavior before slope_window_start"""
-        logger = LossSlopeLogger(slope_window_start=5)
-        mock_trainer = Mock()
-        mock_trainer.current_epoch = 3
-        
-        # Should not compute slope before epoch 5
-        logger.on_train_epoch_end(mock_trainer, Mock())
-        # Verify no slope was logged
-    
-    def test_nan_handling():
-        """Test graceful handling of NaN values"""
-        logger = LossSlopeLogger()
-        losses_with_nan = [1.0, np.nan, 0.8, 0.7]
-        # Should filter NaN and still compute or return None
-        slope = logger._calculate_slope(losses_with_nan)
-        assert slope is None or not np.isnan(slope)
-    ```
-  - Test gradient norm computation:
-    ```python
-    def test_gradient_norm_computation():
-        """Test gradient norm calculation"""
-        # Mock model with known gradients
-        mock_model = create_mock_model_with_gradients()
-        logger = LossSlopeLogger()
-        grad_norm = logger._compute_gradient_norm(mock_model)
-        expected_norm = np.sqrt(sum(g.norm()**2 for g in known_gradients))
-        assert np.abs(grad_norm - expected_norm) < 1e-6
-    ```
-  - Run `lint_fix` then commit: `test: add unit tests for LossSlopeLogger`
+  - Run `lint_fix` then commit: `feat: create LossSlopeLogger using analysis library`
 
-- [ ] **Commit 3**: Integration test LossSlopeLogger
-  - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=2 batch_size=32`
-  - Verify batch-level metrics are logged correctly
-  - Verify gradient norms logged every 0.25 epochs
-  - Run `lint_fix` then commit: `test: verify LossSlopeLogger batch and epoch logging`
-
-- [ ] **Commit 4**: Configure CurvatureMonitor settings
-  - Edit `src/deconcnn/callbacks/curvature_monitor.py`
-  - Add memory optimization parameters to existing implementation:
-    ```python
-    def __init__(self,
-                 compute_every_n_steps: int = 500,
-                 subsample_ratio: float = 0.1,  # Sample 10% of data for Hessian
-                 max_batch_size: int = 32,      # Limit batch size for memory
-                 ...):
-    ```
-  - Update compute method to use subsampling:
-    ```python
-    # Subsample data for memory efficiency
-    n_samples = int(len(dataloader.dataset) * self.subsample_ratio)
-    indices = torch.randperm(len(dataloader.dataset))[:n_samples]
-    ```
-  - Add docstring with memory usage tips and expected compute times
-  - Test memory usage with different subsample ratios
-  - Run `lint_fix` then commit: `feat: add memory optimization to CurvatureMonitor`
-
-- [ ] **Commit 5**: Add unit tests for CurvatureMonitor changes
-  - Create `tests/test_curvature_monitor.py` (or update existing)
-  - Test subsampling functionality:
-    ```python
-    def test_subsampling():
-        """Test that subsampling reduces dataset size correctly"""
-        monitor = CurvatureMonitor(subsample_ratio=0.1)
-        dataset_size = 1000
-        subsampled_size = monitor._get_subsample_size(dataset_size)
-        assert subsampled_size == 100
-    ```
-  - Test memory bounds:
-    ```python
-    def test_max_batch_size_limit():
-        """Test that batch size is limited correctly"""
-        monitor = CurvatureMonitor(max_batch_size=32)
-        original_batch_size = 128
-        limited_size = monitor._limit_batch_size(original_batch_size)
-        assert limited_size == 32
-    ```
-  - Test compute frequency:
-    ```python
-    def test_compute_frequency():
-        """Test that computation happens every N steps"""
-        monitor = CurvatureMonitor(compute_every_n_steps=500)
-        assert monitor.should_compute(global_step=499) is False
-        assert monitor.should_compute(global_step=500) is True
-        assert monitor.should_compute(global_step=501) is False
-    ```
-  - Run `lint_fix` then commit: `test: add unit tests for CurvatureMonitor memory optimization`
-
-- [ ] **Commit 6**: Integration test CurvatureMonitor
-  - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=1 batch_size=128`
-  - Verify metrics computed exactly every 500 steps
-  - Monitor memory usage during computation
-  - Run `lint_fix` then commit: `test: verify CurvatureMonitor 500-step frequency`
-
-- [ ] **Commit 7**: Configure NoiseMonitor settings
-  - Update NoiseMonitor configuration in callback YAML:
-    ```yaml
-    noise_monitor:
-      _target_: deconcnn.callbacks.noise_monitor.NoiseMonitor
-      compute_every_epochs: 2
-      log_epoch_freq: 1
-    ```
-  - Set checkpoint save_top_k=3 in trainer defaults
-  - Ensure PSD tail, gradient variance use correct frequencies
-  - Run `lint_fix` then commit: `feat: configure NoiseMonitor and checkpoint settings`
-
-- [ ] **Commit 8**: Add unit tests for NoiseMonitor configuration
-  - Create `tests/test_noise_monitor_config.py`
-  - Test configuration loading:
-    ```python
-    def test_noise_monitor_frequency():
-        """Test NoiseMonitor computes every 2 epochs"""
-        config = load_callback_config('noise_monitor')
-        assert config['compute_every_epochs'] == 2
-        assert config['log_epoch_freq'] == 1
-    ```
-  - Test checkpoint configuration:
-    ```python
-    def test_checkpoint_save_top_k():
-        """Test checkpoint saves only top 3"""
-        trainer_config = load_trainer_defaults()
-        assert trainer_config['checkpoint']['save_top_k'] == 3
-    ```
-  - Run `lint_fix` then commit: `test: add unit tests for NoiseMonitor configuration`
-
-- [ ] **Commit 9**: Integration test all callbacks
+- [ ] **Commit 7**: Integration test all callbacks
   - Test all callbacks together: LossSlopeLogger + DrExpMetricsCallback + CurvatureMonitor + NoiseMonitor
   - Verify no metric name conflicts
-  - Check total memory usage
+  - Verify each callback's specific behavior:
+    - LossSlopeLogger: logs every batch, computes slopes after epoch 5
+    - CurvatureMonitor: computes every 500 steps
+    - NoiseMonitor: computes every 2 epochs
+    - DrExpMetricsCallback: logs to dr_exp format
+  - Check total memory usage and performance overhead (<15%)
   - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=4 batch_size=32 enable_checkpointing=true`
-  - Run `lint_fix` then commit: `test: validate callback integration`
+  - Run `lint_fix` then commit: `test: validate all callbacks integration`
 
-## Phase 2: Experiment Configurations (5 commits)
+## Phase 3: Experiment Configurations (5 commits)
 
-- [ ] **Commit 10**: Create base experiment config
+- [ ] **Commit 8**: Create base experiment config
   - Create `configs/experiment/loss_lin_slope_base.yaml`:
     ```yaml
     defaults:
@@ -412,13 +637,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Ensure `configs/callbacks/loss_slope_logger.yaml` exists with proper `_target_` path
   - Run `lint_fix` then commit: `feat: create base experiment configuration`
 
-- [ ] **Commit 11**: Test base configuration
+- [ ] **Commit 9**: Test base configuration
   - Load and validate config structure
   - Run 1 epoch test: `uv run python scripts/train_cnn.py machine=mac +experiment=loss_lin_slope_base epochs=1 seed=0 optim.lr=0.1 optim.weight_decay=1e-4`
   - Verify validation runs 4 times per epoch
   - Run `lint_fix` then commit: `test: verify base experiment configuration`
 
-- [ ] **Commit 12**: Create BN-off variant
+- [ ] **Commit 10**: Create BN-off variant
   - Create `configs/experiment/loss_lin_slope_bn_off.yaml`:
     ```yaml
     defaults:
@@ -432,7 +657,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create BN-off experiment variant`
 
-- [ ] **Commit 13**: Create narrow and AdamW variants
+- [ ] **Commit 11**: Create narrow and AdamW variants
   - Create `configs/experiment/loss_lin_slope_narrow.yaml`:
     ```yaml
     defaults:
@@ -454,7 +679,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create narrow and AdamW variants`
 
-- [ ] **Commit 14**: Create unified callback config
+- [ ] **Commit 12**: Create unified callback config
   - Create `configs/callbacks/loss_slope_logger.yaml`:
     ```yaml
     _target_: deconcnn.callbacks.loss_slope_logger.LossSlopeLogger
@@ -476,9 +701,9 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Update experiment configs to reference the unified list
   - Run `lint_fix` then commit: `feat: create unified callback configuration`
 
-## Phase 3: Local Validation (5 commits)
+## Phase 4: Local Validation (5 commits)
 
-- [ ] **Commit 15**: Create validation script
+- [ ] **Commit 13**: Create validation script
   - Create `scripts/validate_local.py`
   - Quick 3-epoch test for single configuration
   - Include machine=mac parameter for local testing
@@ -497,7 +722,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create local validation script`
 
-- [ ] **Commit 16**: Add unit tests for validation script
+- [ ] **Commit 14**: Add unit tests for validation script
   - Create `tests/test_validate_local.py`
   - Test configuration validation:
     ```python
@@ -528,13 +753,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `test: add unit tests for validation script`
 
-- [ ] **Commit 17**: Create test harness
+- [ ] **Commit 15**: Create test harness
   - Create `scripts/test_harness.py`
   - Test all 4 variants sequentially with machine=mac
   - Report pass/fail for each
   - Run `lint_fix` then commit: `feat: create test harness for all variants`
 
-- [ ] **Commit 18**: Add unit tests for test harness
+- [ ] **Commit 16**: Add unit tests for test harness
   - Create `tests/test_test_harness.py`
   - Test variant loading:
     ```python
@@ -567,7 +792,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `test: add unit tests for test harness`
 
-- [ ] **Commit 19**: Create validation notebook and comprehensive tests
+- [ ] **Commit 17**: Create validation notebook and comprehensive tests
   - Create `notebooks/validate_metrics_basic.ipynb`
   - Add unit tests for LossSlopeLogger in `tests/test_loss_slope_logger.py`:
     ```python
@@ -605,9 +830,9 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     - NO-GO if: Missing metrics OR wrong frequencies OR poor fits OR data corruption
   - Run `lint_fix` then commit: `feat: create metric validation notebook and unit tests`
 
-## Phase 4: Job Management (5 commits)
+## Phase 5: Job Management (5 commits)
 
-- [ ] **Commit 20**: Create submission wrapper script
+- [ ] **Commit 18**: Create submission wrapper script
   - Create `scripts/submit_all_loss_slope.sh`:
     ```bash
     #!/bin/bash
@@ -649,7 +874,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create submission wrapper for 216-job sweep`
 
-- [ ] **Commit 21**: Create monitoring script
+- [ ] **Commit 19**: Create monitoring script
   - Create `scripts/monitor_experiment.py`
   - Implement job status tracking using dr_exp API:
     ```python
@@ -709,7 +934,7 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
 # ... other imports as needed
 ```
 
-- [ ] **Commit 22**: Add unit tests for monitoring script
+- [ ] **Commit 20**: Add unit tests for monitoring script
   - Create `tests/test_monitor_experiment.py`
   - Test job status tracking:
     ```python
@@ -757,14 +982,14 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
     ```
   - Run `lint_fix` then commit: `test: add unit tests for experiment monitoring`
 
-- [ ] **Commit 23**: Create failure recovery script
+- [ ] **Commit 21**: Create failure recovery script
   - Create `scripts/recover_failed.py`
   - Detect OOM, timeout, gradient explosion
   - Implement retry logic with parameter adjustment
   - Create `docs/operational_runbook_basic.md`
   - Run `lint_fix` then commit: `feat: create failure recovery system`
 
-- [ ] **Commit 24**: Add unit tests for failure recovery
+- [ ] **Commit 22**: Add unit tests for failure recovery
   - Create `tests/test_recover_failed.py`
   - Test failure detection:
     ```python
@@ -810,21 +1035,21 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
     ```
   - Run `lint_fix` then commit: `test: add unit tests for failure recovery`
 
-## Phase 5: Data Pipeline (5 commits)
+## Phase 6: Data Pipeline (5 commits)
 
-- [ ] **Commit 25**: Create collection script
+- [ ] **Commit 23**: Create collection script
   - Create `scripts/collect_and_archive.sh`
   - Gather results from scratch directory
   - Organize by experiment variant
   - Run `lint_fix` then commit: `feat: create result collection script`
 
-- [ ] **Commit 26**: Create verification script
+- [ ] **Commit 24**: Create verification script
   - Create `scripts/verify_completeness.py`
   - Check all 216 runs completed
   - Report missing or failed runs
   - Run `lint_fix` then commit: `feat: create completeness verification script`
 
-- [ ] **Commit 27**: Add unit tests for verification script
+- [ ] **Commit 25**: Add unit tests for verification script
   - Create `tests/test_verify_completeness.py`
   - Test completeness checking:
     ```python
@@ -850,7 +1075,7 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
     ```
   - Run `lint_fix` then commit: `test: add unit tests for completeness verification`
 
-- [ ] **Commit 28**: Create export script
+- [ ] **Commit 26**: Create export script
   - Create `scripts/prepare_dataset.py`
   - Define output columns for Tier 4 analysis:
     ```python
@@ -905,7 +1130,7 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
   - Save time series data as separate CSV files per run
   - Run `lint_fix` then commit: `feat: create dataset export script`
 
-- [ ] **Commit 29**: Add unit tests for export script
+- [ ] **Commit 27**: Add unit tests for export script
   - Create `tests/test_prepare_dataset.py`
   - Test schema validation:
     ```python
@@ -966,11 +1191,11 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
     ```
   - Run `lint_fix` then commit: `test: add unit tests for dataset export`
 
-## Phase 6: Cluster Execution (2 commits - MANUAL EXECUTION)
+## Phase 7: Cluster Execution (2 commits - MANUAL EXECUTION)
 
 **Note: These commits require cluster access and will be executed manually**
 
-- [ ] **Commit 30**: Resource verification (MANUAL)
+- [ ] **Commit 28**: Resource verification (MANUAL)
   - Create `scripts/verify_resource_config.py`
   - Define resource profiles (fixed at 2 workers per GPU):
     ```python
@@ -996,7 +1221,7 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
   - Verify all variants run successfully with 2 workers per GPU
   - Run `lint_fix` then commit: `test: verify resource allocation on cluster`
 
-- [ ] **Commit 31**: Execute experiment sweep (MANUAL)
+- [ ] **Commit 29**: Execute experiment sweep (MANUAL)
   - Step 1: Submit jobs to dr_exp queue using wrapper script:
     ```bash
     # Submit all 216 jobs to dr_exp queue
@@ -1119,15 +1344,18 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
 - [ ] Note: ResNet width_mult confirmed working (scales channels, min 8)
 
 ### Validation Checkpoints:
-- [ ] **Commit 9**: All callbacks work together without conflicts
-- [ ] **Commit 11**: Base experiment config loads without errors
-- [ ] **Commit 14**: All 4 variants configured correctly
-- [ ] **Commit 19**: Metric validation notebook confirms proper logging formats
-- [ ] **Commit 29**: All scripts created and tested locally
-- [ ] **Commit 30**: Resource testing prevents OOMs on cluster
-- [ ] **Commit 31**: 216-job sweep successfully submitted and completed
+- [ ] **Commit 7**: All callbacks work together without conflicts
+- [ ] **Commit 9**: Base experiment config loads without errors
+- [ ] **Commit 12**: All 4 variants configured correctly
+- [ ] **Commit 17**: Metric validation notebook confirms proper logging formats
+- [ ] **Commit 27**: All scripts created and tested locally
+- [ ] **Commit 28**: Resource testing prevents OOMs on cluster
+- [ ] **Commit 29**: 216-job sweep successfully submitted and completed
 
 ### Pre-submission Checklist:
+- [ ] Analysis library functions created and tested
+- [ ] All callbacks refactored to use library
+- [ ] LossSlopeLogger created using library functions
 - [ ] LossSlopeLogger logs every batch with nats and bits
 - [ ] Validation runs at 0.25 epoch intervals
 - [ ] CurvatureMonitor computes every 500 steps
@@ -1223,8 +1451,8 @@ To continue this implementation:
 - Commit 21 → Commit 22 (all scripts ready before cluster testing)
 
 ### **Repository Context for Each Commit:**
-- Commits 1-21: Execute in deconCNN repository (local development)
-- Commits 22-23: Execute from deconCNN on cluster (GPU required, MANUAL)
+- Commits 1-27: Execute in deconCNN repository (local development)
+- Commits 28-29: Execute from deconCNN on cluster (GPU required, MANUAL)
 
 ### **Script Execution Pattern:**
 All Python scripts should be executed with `uv run` from repository root:
@@ -1237,27 +1465,32 @@ All Python scripts should be executed with `uv run` from repository root:
 
 ## Success Metrics
 
-**Phase 1 (Callbacks):**
+**Phase 1 (Analysis Library):**
+- Library functions created and tested
+- Slope calculation, power law fitting, PSD, EWMA working
+
+**Phase 2 (Callbacks):**
 - Each callback tested individually
+- Callbacks use library functions correctly
 - Integration test passes without conflicts
 
-**Phase 2 (Configs):**
+**Phase 3 (Configs):**
 - All 4 variants load and run
 - Validation occurs 4x per epoch
 
-**Phase 3 (Validation):**
+**Phase 4 (Validation):**
 - Test harness confirms all variants work
 - Notebook validates data formats
 
-**Phase 4 (Job Management):**
+**Phase 5 (Job Management):**
 - 216 job configurations generated
 - Monitoring and recovery tested
 
-**Phase 5 (Data Pipeline):**
+**Phase 6 (Data Pipeline):**
 - Collection and export scripts functional
 - Data format ready for Tier 4
 
-**Phase 6 (Execution):**
+**Phase 7 (Execution):**
 - Resource testing complete
 - 216 jobs successfully executed
 - All data collected and verified
