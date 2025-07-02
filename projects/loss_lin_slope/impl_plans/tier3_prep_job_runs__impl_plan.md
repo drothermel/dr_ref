@@ -3,8 +3,6 @@
 
 This document provides an atomic implementation plan that gets from 0 to running 216-job sweep in 29 focused commits, ensuring each change is testable and reversible with comprehensive unit testing.
 
-**Streamlined approach**: Extract existing implementations from NoiseMonitor and CurvatureMonitor into library modules FIRST, then create new callbacks using the library. This avoids duplicate code and ensures consistency from the start.
-
 **Atomic commits - each commit does ONE thing well, with explicit testing phases.**
 
 ## 📁 Repository Architecture
@@ -71,32 +69,131 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 
 ### Critical Setup Requirements
 
-- [ ] **Pre-Setup**: Verify environment and create necessary directories
-  ```bash
-  # CRITICAL: Navigate to deconCNN repository first
-  cd /Users/daniellerothermel/drotherm/repos/deconCNN
-  
-  # Verify you're in the correct directory
-  pwd  # Should show: /Users/daniellerothermel/drotherm/repos/deconCNN
-  
-  # Verify dependencies
-  uv run python -c "import pandas, matplotlib, statsmodels, rich; print('Dependencies OK')"
-  
-  # Verify dr_exp_utils module exists and imports correctly
-  uv run python -c "from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job; print('dr_exp_utils OK')"
-  
-  # Verify training script location
-  ls scripts/train_cnn.py  # Should exist
-  
-  # Test basic training with fast_dev_run
-  uv run python scripts/train_cnn.py machine=mac trainer.fast_dev_run=true
-  ```
-  - Dependencies present: pandas>=2.3.0, matplotlib>=3.10.3, statsmodels>=0.14.4, rich>=14.0.0
-  - Verify training script runs without errors: `uv run python scripts/train_cnn.py machine=mac trainer.fast_dev_run=true`
-  - Review BaseMonitor pattern: `cat src/deconcnn/callbacks/base_monitor.py`
-  - Check existing metrics: `grep -n "self.log" src/deconcnn/training/lightning_module.py`
-  - Verify submit script syntax: `uv run python scripts/submit_experiments.py sweep --help`
-  - Run `lint_fix` then commit: `chore: verify environment and dependencies`
+- [ ] **Pre-Setup**: Verify environment and create validation script
+  - First, create `scripts/validate_tier3_setup.py`:
+    ```python
+    """Pre-flight validation for Tier 3 implementation."""
+    
+    import sys
+    from pathlib import Path
+    
+    from omegaconf import OmegaConf
+    
+    
+    def check_dependencies() -> tuple[bool, list[str]]:
+        """Check if required dependencies are installed."""
+        required = [
+            'pandas', 'matplotlib', 'statsmodels', 'rich',
+            'pyhessian', 'scipy', 'hessian_eigenthings'
+        ]
+        
+        missing = []
+        for package in required:
+            try:
+                __import__(package)
+            except ImportError:
+                missing.append(package)
+        
+        return len(missing) == 0, missing
+    
+    
+    def validate_basemonitor() -> tuple[bool, str]:
+        """Validate BaseMonitor exists with expected interface."""
+        try:
+            from deconcnn.callbacks.base_monitor import BaseMonitor
+            
+            # Verify it's a Lightning callback
+            import lightning.pytorch as pl
+            if not issubclass(BaseMonitor, pl.Callback):
+                return False, "BaseMonitor not a Lightning Callback"
+                
+            return True, "BaseMonitor validated"
+            
+        except ImportError as e:
+            return False, f"Cannot import BaseMonitor: {e}"
+    
+    
+    def check_dr_exp() -> tuple[bool, str]:
+        """Check dr_exp integration."""
+        try:
+            from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
+            # The dr_exp_utils module already handles ImportError gracefully
+            return True, "dr_exp_utils available"
+        except ImportError:
+            return False, "Cannot import dr_exp_utils"
+    
+    
+    def validate_configs() -> tuple[bool, list[str]]:
+        """Check if required config directories exist."""
+        config_root = Path("configs")
+        required_dirs = ["callbacks", "experiment", "model", "optim", "lrsched"]
+        
+        missing = []
+        for dir_name in required_dirs:
+            if not (config_root / dir_name).exists():
+                missing.append(f"configs/{dir_name}")
+        
+        return len(missing) == 0, missing
+    
+    
+    def main():
+        """Run validation checks."""
+        print(f"Working directory: {Path.cwd()}")
+        print("Running pre-flight validation...\n")
+        
+        all_ok = True
+        
+        # Check dependencies
+        deps_ok, missing = check_dependencies()
+        print(f"✓ Dependencies: {'PASS' if deps_ok else 'FAIL'}")
+        if not deps_ok:
+            print(f"  Missing: {', '.join(missing)}")
+            print(f"  Run: uv add {' '.join(missing)}")
+            all_ok = False
+        
+        # Check BaseMonitor
+        base_ok, msg = validate_basemonitor()
+        print(f"✓ BaseMonitor: {'PASS' if base_ok else 'FAIL'} - {msg}")
+        all_ok &= base_ok
+        
+        # Check dr_exp
+        dr_ok, msg = check_dr_exp()
+        print(f"✓ dr_exp: {'PASS' if dr_ok else 'FAIL'} - {msg}")
+        all_ok &= dr_ok
+        
+        # Check configs
+        config_ok, missing = validate_configs()
+        print(f"✓ Config dirs: {'PASS' if config_ok else 'FAIL'}")
+        if not config_ok:
+            print(f"  Missing: {', '.join(missing)}")
+            all_ok = False
+        
+        # Test basic training if all checks pass
+        if all_ok:
+            print("\nTesting basic training...")
+            import subprocess
+            result = subprocess.run(
+                ["uv", "run", "python", "scripts/train_cnn.py", 
+                 "machine=mac", "trainer.fast_dev_run=true"],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                print("✓ Training test: PASS")
+            else:
+                print("✓ Training test: FAIL")
+                print(f"  Error: {result.stderr}")
+                all_ok = False
+        
+        print(f"\n{'✅ Ready to proceed!' if all_ok else '❌ Fix issues before proceeding'}")
+        return 0 if all_ok else 1
+    
+    
+    if __name__ == "__main__":
+        sys.exit(main())
+    ```
+  - Run the validation script: `uv run python scripts/validate_tier3_setup.py`
+  - Fix any issues identified by the script
+  - Run `lint_fix` then commit: `chore: add pre-flight validation script`
 
 ## Phase 1: Library Extraction & Refactoring (5 commits)
 
@@ -298,189 +395,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: add slope calculation to analysis library`
 
-- [ ] **Commit 4**: Add AIC computation to library
-  - Add to `src/deconcnn/analysis/utils.py`:
-    ```python
-    def compute_aic(y_true: np.ndarray, y_pred: np.ndarray, k: int, 
-                    use_correction: bool = False) -> float:
-        """
-        Compute Akaike Information Criterion (AIC) for model comparison.
-        
-        For least squares regression with normally distributed errors:
-        AIC = n*log(MSE) + 2k + n + n*log(2π)
-        
-        Since constant terms don't affect model comparison, we use:
-        AIC = n*log(MSE) + 2k
-        
-        Args:
-            y_true: True values (n,)
-            y_pred: Predicted values (n,) 
-            k: Number of parameters (including variance)
-            use_correction: If True, use AICc for small samples
-            
-        Returns:
-            AIC value (lower is better)
-            
-        Notes:
-            - k should include all estimated parameters including variance
-            - For linear regression: k = num_features + 1 (intercept) + 1 (variance)
-            - AICc correction recommended when n/k < 40
-        """
-        n = len(y_true)
-        assert n == len(y_pred), f"Shape mismatch: {n} vs {len(y_pred)}"
-        assert n > k, f"Sample size ({n}) must exceed parameters ({k})"
-        
-        # Calculate residual sum of squares and MSE
-        residuals = y_true - y_pred
-        rss = np.sum(residuals**2)
-        mse = rss / n
-        
-        # Prevent log(0) issues
-        if mse <= 0:
-            raise ValueError(f"Invalid MSE: {mse}. Check predictions.")
-            
-        # Basic AIC
-        aic = n * np.log(mse) + 2 * k
-        
-        # Apply small sample correction if requested
-        if use_correction and n - k - 1 > 0:
-            correction = (2 * k * (k + 1)) / (n - k - 1)
-            aic += correction
-            
-        return aic
-    
-    def compute_aic_weights(aic_values: List[float]) -> np.ndarray:
-        """
-        Compute Akaike weights for model comparison.
-        
-        Args:
-            aic_values: List of AIC values from competing models
-            
-        Returns:
-            Array of weights (sum to 1) indicating relative model probability
-        """
-        aic_values = np.array(aic_values)
-        delta_aic = aic_values - np.min(aic_values)
-        rel_likelihood = np.exp(-0.5 * delta_aic)
-        weights = rel_likelihood / np.sum(rel_likelihood)
-        return weights
-    ```
-  - Add comprehensive tests to `tests/test_analysis_utils.py`:
-    ```python
-    def test_compute_aic_basic():
-        """Test AIC computation with known values."""
-        # Perfect fit case
-        y_true = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        y_pred = y_true.copy()
-        k = 2  # Simple model with 2 parameters
-        
-        # AIC should handle near-zero MSE gracefully
-        with pytest.raises(ValueError, match="Invalid MSE"):
-            compute_aic(y_true, y_pred, k)
-        
-        # Add small noise to avoid zero MSE
-        y_pred_noisy = y_pred + 1e-10
-        aic = compute_aic(y_true, y_pred_noisy, k)
-        assert aic < 0  # Very good fit should have negative AIC
-        
-    def test_compute_aic_linear_regression():
-        """Test AIC against statsmodels reference."""
-        # Generate synthetic data
-        np.random.seed(42)
-        n = 100
-        X = np.random.randn(n, 3)
-        true_coef = np.array([1.5, -2.0, 0.5])
-        y = X @ true_coef + 0.1 * np.random.randn(n)
-        
-        # Fit with sklearn
-        from sklearn.linear_model import LinearRegression
-        lr = LinearRegression()
-        lr.fit(X, y)
-        y_pred = lr.predict(X)
-        
-        # Calculate AIC manually
-        k = X.shape[1] + 1 + 1  # features + intercept + variance
-        aic_manual = compute_aic(y, y_pred, k)
-        
-        # Compare with statsmodels (should be close but not exact due to constants)
-        import statsmodels.api as sm
-        X_sm = sm.add_constant(X)
-        model = sm.OLS(y, X_sm).fit()
-        
-        # The difference should be constant across models
-        # We're mainly checking the implementation is reasonable
-        assert abs(aic_manual - model.aic) < 1000  # Generous bound for constant diff
-        
-    def test_compute_aic_model_comparison():
-        """Test AIC for model selection."""
-        np.random.seed(42)
-        n = 50
-        x = np.linspace(0, 10, n)
-        y_true = 2 * x + 1 + np.random.randn(n)
-        
-        # Model 1: Underfit (constant only)
-        y_pred1 = np.full_like(y_true, np.mean(y_true))
-        aic1 = compute_aic(y_true, y_pred1, k=2)
-        
-        # Model 2: Good fit (linear)
-        coef = np.polyfit(x, y_true, 1)
-        y_pred2 = np.polyval(coef, x)
-        aic2 = compute_aic(y_true, y_pred2, k=3)
-        
-        # Model 3: Overfit (high degree polynomial)
-        coef = np.polyfit(x, y_true, 10)
-        y_pred3 = np.polyval(coef, x)
-        aic3 = compute_aic(y_true, y_pred3, k=12)
-        
-        # Linear model should have lowest AIC
-        assert aic2 < aic1  # Better than underfit
-        assert aic2 < aic3  # Better than overfit (due to penalty)
-        
-    def test_compute_aic_weights():
-        """Test Akaike weight computation."""
-        # Three models with different AICs
-        aic_values = [100, 102, 110]  # Clear winner, close second, poor third
-        weights = compute_aic_weights(aic_values)
-        
-        # Check weights sum to 1
-        assert abs(np.sum(weights) - 1.0) < 1e-10
-        
-        # Check relative ordering
-        assert weights[0] > weights[1] > weights[2]
-        
-        # Check specific values using delta AIC formula
-        delta = np.array(aic_values) - min(aic_values)
-        expected = np.exp(-0.5 * delta)
-        expected /= expected.sum()
-        np.testing.assert_allclose(weights, expected)
-        
-    def test_compute_aic_edge_cases():
-        """Test edge cases and error handling."""
-        y = np.array([1, 2, 3, 4, 5])
-        
-        # Test shape mismatch
-        with pytest.raises(AssertionError, match="Shape mismatch"):
-            compute_aic(y, y[:-1], k=2)
-            
-        # Test too many parameters
-        with pytest.raises(AssertionError, match="Sample size.*must exceed"):
-            compute_aic(y, y, k=10)
-            
-        # Test AICc correction
-        y_pred = y + 0.1 * np.random.randn(len(y))
-        aic_base = compute_aic(y, y_pred, k=3, use_correction=False)
-        aic_corrected = compute_aic(y, y_pred, k=3, use_correction=True)
-        assert aic_corrected > aic_base  # Correction adds penalty
-    ```
-  - Add necessary imports at top of utils.py:
-    ```python
-    from typing import List
-    import numpy as np
-    ```
-  - Run tests and ensure all pass
-  - Run `lint_fix` then commit: `feat: add AIC computation to analysis library`
-
-- [ ] **Commit 5**: Integration test extracted functions
+- [ ] **Commit 4**: Integration test extracted functions
   - Run training with original callbacks to capture baseline metrics
   - Run training with refactored callbacks using library functions
   - Compare outputs to ensure identical behavior:
@@ -503,7 +418,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 
 ## Phase 2: Create New Callback (2 commits)
 
-- [ ] **Commit 6**: Create LossSlopeLogger using library
+- [ ] **Commit 5**: Create LossSlopeLogger using library
   - Create `src/deconcnn/callbacks/loss_slope_logger.py`:
     ```python
     import torch
@@ -576,7 +491,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create LossSlopeLogger using analysis library`
 
-- [ ] **Commit 7**: Integration test all callbacks
+- [ ] **Commit 6**: Integration test all callbacks
   - Test all callbacks together: LossSlopeLogger + DrExpMetricsCallback + CurvatureMonitor + NoiseMonitor
   - Verify no metric name conflicts
   - Verify each callback's specific behavior:
@@ -590,7 +505,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 
 ## Phase 3: Experiment Configurations (5 commits)
 
-- [ ] **Commit 8**: Create base experiment config
+- [ ] **Commit 7**: Create base experiment config
   - Create `configs/experiment/loss_lin_slope_base.yaml`:
     ```yaml
     defaults:
@@ -637,13 +552,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Ensure `configs/callbacks/loss_slope_logger.yaml` exists with proper `_target_` path
   - Run `lint_fix` then commit: `feat: create base experiment configuration`
 
-- [ ] **Commit 9**: Test base configuration
+- [ ] **Commit 8**: Test base configuration
   - Load and validate config structure
   - Run 1 epoch test: `uv run python scripts/train_cnn.py machine=mac +experiment=loss_lin_slope_base epochs=1 seed=0 optim.lr=0.1 optim.weight_decay=1e-4`
   - Verify validation runs 4 times per epoch
   - Run `lint_fix` then commit: `test: verify base experiment configuration`
 
-- [ ] **Commit 10**: Create BN-off variant
+- [ ] **Commit 9**: Create BN-off variant
   - Create `configs/experiment/loss_lin_slope_bn_off.yaml`:
     ```yaml
     defaults:
@@ -657,7 +572,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create BN-off experiment variant`
 
-- [ ] **Commit 11**: Create narrow and AdamW variants
+- [ ] **Commit 10**: Create narrow and AdamW variants
   - Create `configs/experiment/loss_lin_slope_narrow.yaml`:
     ```yaml
     defaults:
@@ -679,7 +594,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Run `lint_fix` then commit: `feat: create narrow and AdamW variants`
 
-- [ ] **Commit 12**: Create unified callback config
+- [ ] **Commit 11**: Create unified callback config
   - Create `configs/callbacks/loss_slope_logger.yaml`:
     ```yaml
     _target_: deconcnn.callbacks.loss_slope_logger.LossSlopeLogger
@@ -704,21 +619,63 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 ## Phase 4: Local Validation (5 commits)
 
 - [ ] **Commit 13**: Create validation script
-  - Create `scripts/validate_local.py`
-  - Quick 3-epoch test for single configuration
-  - Include machine=mac parameter for local testing
-  - Check output formats and logging
-  - Example command in script:
+  - Create `scripts/validate_local.py`:
     ```python
-    cmd = [
-        "uv", "run", "python", "scripts/train_cnn.py",
-        "machine=mac",  # Critical for Mac testing
-        "+experiment=loss_lin_slope_base",
-        "epochs=3",
-        "seed=0",
-        "optim.lr=0.1",
-        "optim.weight_decay=1e-4"
-    ]
+    """Validate loss slope experiment configuration locally."""
+    
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    
+    def validate_single_config():
+        """Run quick validation of single configuration."""
+        cmd = [
+            "uv", "run", "python", "scripts/train_cnn.py",
+            "machine=mac",  # Critical for Mac testing
+            "+experiment=loss_lin_slope_base",
+            "epochs=3",
+            "seed=0",
+            "optim.lr=0.1",
+            "optim.weight_decay=1e-4"
+        ]
+        
+        print(f"Running: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"Error: {result.stderr}")
+            return False
+            
+        # Check for expected output patterns
+        output = result.stdout
+        checks = {
+            "loss_slope/alpha_5_15": "loss_slope/alpha_5_15" in output,
+            "grad_norm_periodic": "loss_slope/grad_norm_periodic" in output,
+            "validation frequency": output.count("Validation") >= 12  # 4x per epoch * 3 epochs
+        }
+        
+        print("\nValidation results:")
+        for check, passed in checks.items():
+            print(f"  {check}: {'✓' if passed else '✗'}")
+            
+        return all(checks.values())
+    
+    
+    def main():
+        """Main validation entry point."""
+        print(f"Working directory: {Path.cwd()}")
+        
+        if validate_single_config():
+            print("\n✅ Local validation passed!")
+            return 0
+        else:
+            print("\n❌ Local validation failed!")
+            return 1
+    
+    
+    if __name__ == "__main__":
+        sys.exit(main())
     ```
   - Run `lint_fix` then commit: `feat: create local validation script`
 
@@ -836,7 +793,14 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Create `scripts/submit_all_loss_slope.sh`:
     ```bash
     #!/bin/bash
-    # Submit all 216 jobs using existing infrastructure
+    # Submit all 216 jobs for loss slope experiment
+    
+    # Check we're in the right place
+    if [[ ! -f "scripts/submit_experiments.py" ]]; then
+        echo "Error: Please run this script from the project root directory"
+        echo "Current directory: $(pwd)"
+        exit 1
+    fi
     
     # Configuration
     VARIANTS="base bn_off narrow adamw"
@@ -847,6 +811,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     # Submit jobs for each variant
     for variant in $VARIANTS; do
         echo "Submitting $variant variant (54 jobs)..."
+        
         uv run python scripts/submit_experiments.py sweep \
           configs/experiment/loss_lin_slope_${variant}.yaml \
           --param lr=$LRS \
@@ -855,11 +820,16 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
           --experiment loss_lin_slope \
           --priority 100
         
-        # Add small delay to avoid overwhelming the system
-        sleep 2
+        # Check submission status
+        if [[ $? -ne 0 ]]; then
+            echo "Error submitting $variant jobs"
+            exit 1
+        fi
+        
+        sleep 2  # Brief pause between variants
     done
     
-    echo "All 216 jobs submitted!"
+    echo "All 216 jobs submitted successfully!"
     ```
   - Make script executable: `chmod +x scripts/submit_all_loss_slope.sh`
   - Test with dry run first:
@@ -875,33 +845,62 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Run `lint_fix` then commit: `feat: create submission wrapper for 216-job sweep`
 
 - [ ] **Commit 19**: Create monitoring script
-  - Create `scripts/monitor_experiment.py`
-  - Implement job status tracking using dr_exp API:
+  - Create `scripts/monitor_experiment.py`:
     ```python
-    #!/usr/bin/env python
     """Monitor deconCNN experiment progress."""
     
-    import numpy as np
     from datetime import datetime
+    
+    import numpy as np
+    from rich.console import Console
+    from rich.table import Table
     
     from deconcnn.dr_exp_utils import list_decon_jobs
     
+    
     def monitor_experiment(experiment_name: str = "loss_lin_slope"):
         """Monitor job status for loss slope experiment."""
-        # Track: jobs queued/running/completed/failed
+        console = Console()
+        
+        # Get jobs using existing utility
         jobs = list_decon_jobs(experiment=experiment_name)
         
-        status = {
-            'queued': sum(1 for j in jobs if j['status'] == 'queued'),
-            'running': sum(1 for j in jobs if j['status'] == 'running'),
-            'completed': sum(1 for j in jobs if j['status'] == 'completed'),
-            'failed': sum(1 for j in jobs if j['status'] == 'failed')
+        # Count statuses
+        status_counts = {
+            'queued': 0,
+            'running': 0,
+            'completed': 0,
+            'failed': 0
         }
         
-        print(f"Experiment: {experiment_name}")
-        print(f"Total jobs: {len(jobs)}")
-        print(f"Status breakdown: {status}")
-        return status
+        for job in jobs:
+            status = job.get('status', 'unknown')
+            if status in status_counts:
+                status_counts[status] += 1
+        
+        # Display results
+        table = Table(title=f"Experiment: {experiment_name}")
+        table.add_column("Status", style="cyan")
+        table.add_column("Count", style="magenta")
+        
+        for status, count in status_counts.items():
+            table.add_row(status.capitalize(), str(count))
+        
+        console.print(table)
+        return status_counts
+    
+    
+    def main():
+        """Main entry point."""
+        status = monitor_experiment()
+        
+        # Return non-zero if failures
+        return 1 if status.get('failed', 0) > 0 else 0
+    
+    
+    if __name__ == "__main__":
+        import sys
+        sys.exit(main())
     ```
   - Add data quality checks:
     ```python
@@ -924,14 +923,18 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Progress reporting with ETA based on average job runtime
   - Run `lint_fix` then commit: `feat: create experiment monitoring script`
 
-### Python Script Template for All Scripts
-For consistency, all Python scripts in `scripts/` should follow this pattern:
+### Python Script Import Pattern
+For consistency, all Python scripts in `scripts/` should follow this import pattern:
 ```python
-#!/usr/bin/env python
 """Script description."""
 
-from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
-# ... other imports as needed
+import standard_library_modules
+from standard_library import specific_items
+
+import third_party_modules
+from third_party import specific_items
+
+from deconcnn.module import local_imports
 ```
 
 - [ ] **Commit 20**: Add unit tests for monitoring script
@@ -983,10 +986,80 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
   - Run `lint_fix` then commit: `test: add unit tests for experiment monitoring`
 
 - [ ] **Commit 21**: Create failure recovery script
-  - Create `scripts/recover_failed.py`
-  - Detect OOM, timeout, gradient explosion
-  - Implement retry logic with parameter adjustment
-  - Create `docs/operational_runbook_basic.md`
+  - Create `scripts/recover_failed.py`:
+    ```python
+    """Recover failed jobs with parameter adjustments."""
+    
+    import json
+    from pathlib import Path
+    from typing import Dict, List
+    
+    from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
+    
+    
+    class FailureRecovery:
+        """Handle recovery of failed experiments."""
+        
+        def __init__(self):
+            self.failure_patterns = {
+                'OOM': ['CUDA out of memory', 'OutOfMemoryError'],
+                'gradient': ['gradient overflow', 'nan loss', 'inf detected'],
+                'timeout': ['TimeoutError', 'SLURM timeout']
+            }
+            
+        def detect_failure_type(self, error_log: str) -> str:
+            """Detect type of failure from error log."""
+            for failure_type, patterns in self.failure_patterns.items():
+                if any(pattern in error_log for pattern in patterns):
+                    return failure_type
+            return 'unknown'
+            
+        def adjust_for_oom(self, params: Dict) -> Dict:
+            """Adjust parameters for OOM failures."""
+            adjusted = params.copy()
+            # Halve batch size
+            if 'batch_size' in adjusted:
+                adjusted['batch_size'] = max(16, adjusted['batch_size'] // 2)
+            # Reduce workers
+            if 'workers' in adjusted:
+                adjusted['workers'] = max(1, adjusted['workers'] // 2)
+            return adjusted
+            
+        def should_retry(self, failure_type: str, attempts: int) -> bool:
+            """Determine if job should be retried."""
+            max_retries = {'OOM': 3, 'gradient': 2, 'timeout': 1}
+            return attempts < max_retries.get(failure_type, 0)
+    
+    
+    def main():
+        """Main recovery logic."""
+        recovery = FailureRecovery()
+        
+        # Get failed jobs
+        try:
+            jobs = list_decon_jobs(experiment="loss_lin_slope", status="failed")
+        except ImportError:
+            print("dr_exp not available. Cannot recover jobs.")
+            return 1
+            
+        print(f"Found {len(jobs)} failed jobs")
+        
+        # Process each failed job
+        recovered = 0
+        for job in jobs:
+            # Analyze failure and potentially retry
+            # Implementation details...
+            pass
+            
+        print(f"Recovered {recovered} jobs")
+        return 0
+    
+    
+    if __name__ == "__main__":
+        import sys
+        sys.exit(main())
+    ```
+  - Create `docs/operational_runbook_basic.md` with common failure patterns
   - Run `lint_fix` then commit: `feat: create failure recovery system`
 
 - [ ] **Commit 22**: Add unit tests for failure recovery
@@ -1044,9 +1117,83 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
   - Run `lint_fix` then commit: `feat: create result collection script`
 
 - [ ] **Commit 24**: Create verification script
-  - Create `scripts/verify_completeness.py`
-  - Check all 216 runs completed
-  - Report missing or failed runs
+  - Create `scripts/verify_completeness.py`:
+    ```python
+    """Verify completeness of experiment runs."""
+    
+    import itertools
+    from typing import List, Tuple
+    
+    from rich.console import Console
+    from rich.table import Table
+    
+    from deconcnn.dr_exp_utils import list_decon_jobs
+    
+    
+    class CompletenessVerifier:
+        """Verify all expected runs are complete."""
+        
+        def __init__(self):
+            self.variants = ['base', 'bn_off', 'narrow', 'adamw']
+            self.lrs = [0.05, 0.1, 0.2]
+            self.wds = [1e-4, 1e-3, 1e-2]
+            self.seeds = [0, 1, 2, 3, 4, 5]
+            
+        def get_expected_runs(self) -> List[Tuple]:
+            """Generate all expected run configurations."""
+            return list(itertools.product(
+                self.variants, self.lrs, self.wds, self.seeds
+            ))
+            
+        def find_missing(self, expected: List[Tuple], actual: List[Tuple]) -> List[Tuple]:
+            """Find missing runs."""
+            actual_set = set(actual)
+            return [run for run in expected if run not in actual_set]
+    
+    
+    def main():
+        """Main verification logic."""
+        console = Console()
+        verifier = CompletenessVerifier()
+        
+        # Get completed jobs
+        try:
+            jobs = list_decon_jobs(experiment="loss_lin_slope")
+        except ImportError:
+            console.print("[red]dr_exp not available. Cannot verify completeness.[/red]")
+            return 1
+            
+        # Extract configurations from completed jobs
+        completed_configs = []
+        for job in jobs:
+            if job['status'] == 'completed':
+                # Extract config from job metadata
+                # Implementation depends on job structure
+                pass
+                
+        # Check completeness
+        expected = verifier.get_expected_runs()
+        missing = verifier.find_missing(expected, completed_configs)
+        
+        # Report results
+        console.print(f"\nExpected runs: {len(expected)}")
+        console.print(f"Completed runs: {len(completed_configs)}")
+        console.print(f"Missing runs: {len(missing)}")
+        
+        if missing:
+            console.print("\n[yellow]Missing configurations:[/yellow]")
+            for variant, lr, wd, seed in missing[:10]:  # Show first 10
+                console.print(f"  {variant} lr={lr} wd={wd} seed={seed}")
+            if len(missing) > 10:
+                console.print(f"  ... and {len(missing) - 10} more")
+                
+        return 0 if not missing else 1
+    
+    
+    if __name__ == "__main__":
+        import sys
+        sys.exit(main())
+    ```
   - Run `lint_fix` then commit: `feat: create completeness verification script`
 
 - [ ] **Commit 25**: Add unit tests for verification script
@@ -1076,9 +1223,20 @@ from deconcnn.dr_exp_utils import list_decon_jobs, submit_training_job
   - Run `lint_fix` then commit: `test: add unit tests for completeness verification`
 
 - [ ] **Commit 26**: Create export script
-  - Create `scripts/prepare_dataset.py`
-  - Define output columns for Tier 4 analysis:
+  - Create `scripts/prepare_dataset.py`:
     ```python
+    """Prepare dataset for Tier 4 analysis."""
+    
+    import json
+    from datetime import datetime
+    from pathlib import Path
+    from typing import Dict, List
+    
+    import pandas as pd
+    
+    from deconcnn.dr_exp_utils import list_decon_jobs
+    
+    
     OUTPUT_COLUMNS = [
         # Identifiers
         'run_id', 'variant', 'seed', 'lr', 'weight_decay',
@@ -1498,3 +1656,4 @@ All Python scripts should be executed with `uv run` from repository root:
 ---
 
 Remember: Quality over speed. Test thoroughly. Fix all linting issues. Document changes.
+
