@@ -28,12 +28,6 @@ PyTorch/Lightning components
 - Shell scripts don't specify working directory requirements
 - Python scripts don't show shebang lines or how they find imports
 
-6. Integration Points Unclear
-
-- How does LossSlopeLogger access trainer.callback_metrics?
-- When/how are callbacks registered with the trainer?
-- How does the callback know when 0.25 epochs have passed?
-
 7. Missing Validation Steps
 
 - No verification that dr_exp is properly configured before submitting jobs

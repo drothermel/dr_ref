@@ -103,6 +103,10 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Inherit from BaseMonitor (see existing callbacks for pattern)
   - Key implementation structure:
     ```python
+    import torch
+    import numpy as np
+    from .base_monitor import BaseMonitor
+    
     class LossSlopeLogger(BaseMonitor):
         def __init__(self, 
                      log_every_n_steps: int = 1,
@@ -112,18 +116,57 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
                      slope_window_end: int = 15,
                      debug_mode: bool = True):
             super().__init__(log_every_n_steps, log_epoch_freq, debug_mode)
+            self.burn_in_epochs = burn_in_epochs
+            self.slope_window_start = slope_window_start
+            self.slope_window_end = slope_window_end
+            self.epoch_losses = {}  # Store losses by epoch for slope calculation
+            
+        def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+            """Log metrics every batch and quarter epoch."""
+            # Access loss from callback_metrics (following lightning_module.py:150 pattern)
+            train_loss = trainer.callback_metrics.get("train_loss", None)
+            if train_loss is None:
+                return
+            
+            # Convert tensor to float if needed
+            if isinstance(train_loss, torch.Tensor):
+                train_loss = train_loss.item()
+            
+            # Store for slope calculation
+            current_epoch = trainer.current_epoch
+            if current_epoch not in self.epoch_losses:
+                self.epoch_losses[current_epoch] = []
+            self.epoch_losses[current_epoch].append(train_loss)
+            
+            # Quarter-epoch periodic logging (following gradient_monitor.py:45-47 pattern)
+            total_batches = len(trainer.train_dataloader)
+            quarter_epoch_interval = max(1, total_batches // 4)
+            if batch_idx % quarter_epoch_interval == 0:
+                # Compute and log periodic norms
+                grad_norm = self._compute_gradient_norm(pl_module)
+                weight_norm = self._compute_weight_norm(pl_module)
+                
+                pl_module.log_dict({
+                    "loss_slope/grad_norm_periodic": grad_norm,
+                    "loss_slope/weight_norm_periodic": weight_norm
+                }, on_step=True)
+                
+        def on_train_epoch_end(self, trainer, pl_module):
+            """Calculate and log slope metrics at epoch end."""
+            if trainer.current_epoch >= self.slope_window_start:
+                # Calculate slopes using stored loss history
+                alpha_early = self._calculate_slope(
+                    self.epoch_losses, 
+                    start=self.slope_window_start, 
+                    end=min(self.slope_window_end, trainer.current_epoch + 1)
+                )
+                if alpha_early is not None:
+                    pl_module.log("loss_slope/alpha_5_15", alpha_early)
     ```
   - Focus on NEW metrics only with unique names:
     - Use `loss_slope/` prefix for all metrics to avoid conflicts
-    - Periodic gradient and weight norm tracking (every 0.25 epochs):
-      - `loss_slope/grad_norm_periodic`: L2 norm of all gradients
-      - `loss_slope/weight_norm_periodic`: L2 norm of all weights
-    - Implement slope calculation:
-      - `loss_slope/alpha_5_15`: Slope computed over epochs 5-15 using least squares
-      - `loss_slope/alpha_full`: Slope from burn-in to current epoch
-      - Store loss history internally for slope computation
-  - Use existing loss values from `trainer.callback_metrics['train_loss']`
-  - Use `self.pl_module.log_dict()` for logging new metrics
+    - Periodic gradient and weight norm tracking (every 0.25 epochs)
+    - Implement slope calculation using numpy.polyfit for least squares
   - Add comprehensive docstrings explaining slope methodology
   - Run `lint_fix` then commit: `feat: implement LossSlopeLogger callback`
 
@@ -140,21 +183,63 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         reference_slope = np.polyfit(range(5, 15), losses[5:15], 1)[0]
         assert np.abs(calculated_slope - reference_slope) < 1e-6
     ```
+  - Test Lightning integration with mocking:
+    ```python
+    from unittest.mock import Mock
+    import torch
+    
+    def test_metric_access_from_callback_metrics():
+        """Test accessing metrics from trainer.callback_metrics"""
+        # Mock trainer with callback_metrics
+        mock_trainer = Mock()
+        mock_trainer.callback_metrics = {"train_loss": torch.tensor(2.3)}
+        mock_trainer.current_epoch = 5
+        mock_trainer.train_dataloader = [None] * 100  # Mock 100 batches
+        
+        # Mock pl_module
+        mock_pl_module = Mock()
+        logged_metrics = {}
+        mock_pl_module.log_dict = lambda x, **kwargs: logged_metrics.update(x)
+        
+        # Test the callback
+        logger = LossSlopeLogger()
+        logger.on_train_batch_end(mock_trainer, mock_pl_module, None, None, 25)
+        
+        # Verify it stored the loss
+        assert 5 in logger.epoch_losses
+        assert 2.3 in logger.epoch_losses[5]
+        
+        # Verify quarter-epoch metrics were logged (25 is 1/4 of 100)
+        assert "loss_slope/grad_norm_periodic" in logged_metrics
+        assert "loss_slope/weight_norm_periodic" in logged_metrics
+    ```
   - Test metric naming and prefixing:
     ```python
     def test_metric_prefixing():
         """Ensure all metrics use loss_slope/ prefix"""
+        mock_trainer = Mock()
+        mock_pl_module = Mock()
+        logged_metrics = {}
+        mock_pl_module.log = lambda k, v, **kwargs: logged_metrics.update({k: v})
+        mock_pl_module.log_dict = lambda x, **kwargs: logged_metrics.update(x)
+        
         logger = LossSlopeLogger()
-        metrics = logger._prepare_metrics(...)
-        assert all(k.startswith('loss_slope/') for k in metrics.keys())
+        # Simulate various callback methods
+        # ... test code ...
+        
+        assert all(k.startswith('loss_slope/') for k in logged_metrics.keys())
     ```
   - Test edge cases:
     ```python
     def test_early_epoch_handling():
         """Test behavior before slope_window_start"""
         logger = LossSlopeLogger(slope_window_start=5)
+        mock_trainer = Mock()
+        mock_trainer.current_epoch = 3
+        
         # Should not compute slope before epoch 5
-        assert logger._should_compute_slope(epoch=3) is False
+        logger.on_train_epoch_end(mock_trainer, Mock())
+        # Verify no slope was logged
     
     def test_nan_handling():
         """Test graceful handling of NaN values"""
@@ -323,6 +408,8 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     warmup:
       epochs: 5
     ```
+  - **NOTE on callback registration**: Callbacks listed in the YAML are automatically instantiated by Hydra and registered with the PyTorch Lightning Trainer. No manual registration is needed - the trainer receives all callbacks via the `callbacks` parameter when instantiated.
+  - Ensure `configs/callbacks/loss_slope_logger.yaml` exists with proper `_target_` path
   - Run `lint_fix` then commit: `feat: create base experiment configuration`
 
 - [ ] **Commit 11**: Test base configuration
@@ -368,9 +455,25 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Run `lint_fix` then commit: `feat: create narrow and AdamW variants`
 
 - [ ] **Commit 14**: Create unified callback config
-  - Create `configs/callbacks/loss_lin_slope_metrics.yaml`
-  - Consolidate all callback settings in one place
-  - Update experiment configs to reference it
+  - Create `configs/callbacks/loss_slope_logger.yaml`:
+    ```yaml
+    _target_: deconcnn.callbacks.loss_slope_logger.LossSlopeLogger
+    log_every_n_steps: 1
+    log_epoch_freq: 1
+    burn_in_epochs: 5
+    slope_window_start: 5
+    slope_window_end: 15
+    debug_mode: ${debug_mode:false}  # Can be overridden
+    ```
+  - Create `configs/callbacks/loss_lin_slope_metrics.yaml` that includes all callbacks:
+    ```yaml
+    - gradient_monitor
+    - noise_monitor
+    - curvature_monitor
+    - loss_slope_logger
+    - dr_exp_metrics
+    ```
+  - Update experiment configs to reference the unified list
   - Run `lint_fix` then commit: `feat: create unified callback configuration`
 
 ## Phase 3: Local Validation (5 commits)
