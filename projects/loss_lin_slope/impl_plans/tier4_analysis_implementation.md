@@ -1,5 +1,72 @@
 # Implementation Plan: Tier 4 Analysis Suite (deconCNN)
 
+## 🔄 DEFERRED ELEMENTS FROM TIER 3 OPTIMIZATION (Added 2025-07-01)
+
+**NOTE**: The following elements were deferred from Tier 3 to focus on the critical path. They should be implemented in Tier 4 for complete functionality.
+
+### Analysis Library Implementation (Deferred from Tier 3)
+
+**Location**: `src/deconcnn/analysis/` (directory created in Tier 3)
+
+1. **Knee Detection** (`knee_detector.py`)
+   - AIC-based knee detection for burn-in analysis
+   - Required for identifying training phase transitions
+   - Should include docstrings and type hints
+   - Test with synthetic data for validation
+
+2. **Power Law Fitting** (`power_law_fitter.py`)
+   - Extract and consolidate existing implementation from `src/deconcnn/callbacks/noise_monitor.py:102-107`
+   - Enhanced functionality for robust fitting
+   - Handle numerical stability issues
+   - Update NoiseMonitor to use shared utility
+   - **AVOIDS DUPLICATION**: Existing implementation needs consolidation
+
+3. **Enhanced Metric Validation** (`metric_validator.py` - extends basic version from Tier 3)
+   - **Advanced data quality validation** (extends real-time monitoring from Tier 3 Commit 9)
+   - Statistical validation: outlier detection, consistency checks, temporal validation
+   - Cross-experiment validation: variant comparison, parameter sensitivity, reproducibility
+   - Comprehensive completeness checking beyond basic range validation
+   - **NOTE**: Basic NaN/inf detection and range validation covered in Tier 3 Commit 9
+
+### Advanced Monitoring (Deferred from Tier 3)
+
+1. **Enhanced Failure Recovery** (extends basic version from Tier 3)
+   - Expand `scripts/recover_failed.py` with advanced retry strategies
+   - Add machine learning-based failure prediction
+   - Advanced parameter adjustment algorithms
+   - **NOTE**: Basic failure recovery covered in Tier 3 Commit 9
+
+2. **Real-time Monitoring Dashboard** (`scripts/monitor_experiment.py` enhancement)
+   - Advanced progress tracking by variant and parameter
+   - Failure warnings and completion rate analytics
+   - Integration with existing basic monitoring from Tier 3
+
+3. **Advanced Job Monitoring** (`scripts/monitor_jobs.py` enhancement)
+   - Enhanced job status tracking and completion analytics
+   - Failure detection and automated reporting
+   - Integration with dr_exp job management
+
+### Comprehensive Documentation (Deferred from Tier 3)
+
+1. **Enhanced Metric Validation** (extends basic version from Tier 3)
+   - Expand `notebooks/validate_metrics_basic.ipynb` into comprehensive analysis
+   - Add advanced metric quality checks and statistical validation
+   - Deep-dive analysis of logging patterns and data quality
+   - **NOTE**: Basic validation covered in Tier 3 Commit 7
+
+2. **Enhanced Operational Documentation** (extends basic version from Tier 3)
+   - Expand `docs/operational_runbook_basic.md` into comprehensive guide
+   - Add advanced troubleshooting scenarios and solutions
+   - Detailed performance optimization procedures
+   - **NOTE**: Basic operational readiness covered in Tier 3 Commit 9
+
+3. **Advanced Examples and Tutorials**
+   - Integration examples for analysis utilities
+   - Performance optimization guides
+   - Research insights and optimizations
+
+---
+
 ## ⚠️ ADDITIONAL CONSIDERATIONS FROM TIER 3 REVIEW (Added 2025-01-01)
 
 **NOTE**: The following items may become relevant during implementation. They were identified during Tier 3 review but are not critical for the core logging infrastructure.
@@ -15,12 +82,11 @@
          """Convert dr_exp metrics.jsonl to CSV for analysis."""
      ```
 
-2. **Missing Analysis Functions**
-   - Need to implement before Phase 1:
-     - `knee_detector.py` - AIC-based knee detection
-     - `power_law_fitter.py` - Single/two-power law fitting
-     - `metric_validator.py` - Completeness checking
-   - Consider extracting from existing dr_results analysis scripts
+2. **Analysis Functions Status Update**
+   - ✅ **Deferred to Tier 4**: `knee_detector.py`, `power_law_fitter.py`, `metric_validator.py`
+   - ✅ **Directory Created**: `src/deconcnn/analysis/` in Tier 3 Commit 1
+   - ⚠️ **Power Law Consolidation**: Extract from `noise_monitor.py:102-107` to avoid duplication
+   - 📋 **Implementation Priority**: Phase 1 of Tier 4 implementation
 
 3. **Library Strategy Updates**
    - BackPACK is being used for trace estimation (more efficient)
