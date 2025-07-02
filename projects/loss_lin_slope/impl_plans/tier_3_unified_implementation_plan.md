@@ -84,7 +84,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Review BaseMonitor pattern: `cat src/deconcnn/callbacks/base_monitor.py`
   - Check existing metrics: `grep -n "self.log" src/deconcnn/training/lightning_module.py`
   - Verify submit script syntax: `uv run python scripts/submit_experiments.py sweep --help`
-  - Commit: `chore: verify environment and dependencies`
+  - Run `lint_fix` then commit: `chore: verify environment and dependencies`
 
 ## Phase 1: Core Callbacks (9 commits)
 
@@ -115,7 +115,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Use existing loss values from `trainer.callback_metrics['train_loss']`
   - Use `self.pl_module.log_dict()` for logging new metrics
   - Add comprehensive docstrings explaining slope methodology
-  - Commit: `feat: implement LossSlopeLogger callback`
+  - Run `lint_fix` then commit: `feat: implement LossSlopeLogger callback`
 
 - [ ] **Commit 2**: Add unit tests for LossSlopeLogger
   - Create `tests/test_loss_slope_logger.py`
@@ -165,13 +165,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         expected_norm = np.sqrt(sum(g.norm()**2 for g in known_gradients))
         assert np.abs(grad_norm - expected_norm) < 1e-6
     ```
-  - Commit: `test: add unit tests for LossSlopeLogger`
+  - Run `lint_fix` then commit: `test: add unit tests for LossSlopeLogger`
 
 - [ ] **Commit 3**: Integration test LossSlopeLogger
   - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=2 batch_size=32`
   - Verify batch-level metrics are logged correctly
   - Verify gradient norms logged every 0.25 epochs
-  - Commit: `test: verify LossSlopeLogger batch and epoch logging`
+  - Run `lint_fix` then commit: `test: verify LossSlopeLogger batch and epoch logging`
 
 - [ ] **Commit 4**: Configure CurvatureMonitor settings
   - Edit `src/deconcnn/callbacks/curvature_monitor.py`
@@ -191,7 +191,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Add docstring with memory usage tips and expected compute times
   - Test memory usage with different subsample ratios
-  - Commit: `feat: add memory optimization to CurvatureMonitor`
+  - Run `lint_fix` then commit: `feat: add memory optimization to CurvatureMonitor`
 
 - [ ] **Commit 5**: Add unit tests for CurvatureMonitor changes
   - Create `tests/test_curvature_monitor.py` (or update existing)
@@ -222,13 +222,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         assert monitor.should_compute(global_step=500) is True
         assert monitor.should_compute(global_step=501) is False
     ```
-  - Commit: `test: add unit tests for CurvatureMonitor memory optimization`
+  - Run `lint_fix` then commit: `test: add unit tests for CurvatureMonitor memory optimization`
 
 - [ ] **Commit 6**: Integration test CurvatureMonitor
   - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=1 batch_size=128`
   - Verify metrics computed exactly every 500 steps
   - Monitor memory usage during computation
-  - Commit: `test: verify CurvatureMonitor 500-step frequency`
+  - Run `lint_fix` then commit: `test: verify CurvatureMonitor 500-step frequency`
 
 - [ ] **Commit 7**: Configure NoiseMonitor settings
   - Update NoiseMonitor configuration in callback YAML:
@@ -240,7 +240,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Set checkpoint save_top_k=3 in trainer defaults
   - Ensure PSD tail, gradient variance use correct frequencies
-  - Commit: `feat: configure NoiseMonitor and checkpoint settings`
+  - Run `lint_fix` then commit: `feat: configure NoiseMonitor and checkpoint settings`
 
 - [ ] **Commit 8**: Add unit tests for NoiseMonitor configuration
   - Create `tests/test_noise_monitor_config.py`
@@ -259,14 +259,14 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         trainer_config = load_trainer_defaults()
         assert trainer_config['checkpoint']['save_top_k'] == 3
     ```
-  - Commit: `test: add unit tests for NoiseMonitor configuration`
+  - Run `lint_fix` then commit: `test: add unit tests for NoiseMonitor configuration`
 
 - [ ] **Commit 9**: Integration test all callbacks
   - Test all callbacks together: LossSlopeLogger + DrExpMetricsCallback + CurvatureMonitor + NoiseMonitor
   - Verify no metric name conflicts
   - Check total memory usage
   - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=4 batch_size=32 enable_checkpointing=true`
-  - Commit: `test: validate callback integration`
+  - Run `lint_fix` then commit: `test: validate callback integration`
 
 ## Phase 2: Experiment Configurations (5 commits)
 
@@ -313,13 +313,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     warmup:
       epochs: 5
     ```
-  - Commit: `feat: create base experiment configuration`
+  - Run `lint_fix` then commit: `feat: create base experiment configuration`
 
 - [ ] **Commit 11**: Test base configuration
   - Load and validate config structure
   - Run 1 epoch test: `uv run python scripts/train_cnn.py machine=mac +experiment=loss_lin_slope_base epochs=1 seed=0 optim.lr=0.1 optim.weight_decay=1e-4`
   - Verify validation runs 4 times per epoch
-  - Commit: `test: verify base experiment configuration`
+  - Run `lint_fix` then commit: `test: verify base experiment configuration`
 
 - [ ] **Commit 12**: Create BN-off variant
   - Create `configs/experiment/loss_lin_slope_bn_off.yaml`:
@@ -333,7 +333,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     trainer:
       gradient_clip_val: 1.0  # Critical for stability without BN
     ```
-  - Commit: `feat: create BN-off experiment variant`
+  - Run `lint_fix` then commit: `feat: create BN-off experiment variant`
 
 - [ ] **Commit 13**: Create narrow and AdamW variants
   - Create `configs/experiment/loss_lin_slope_narrow.yaml`:
@@ -355,13 +355,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
       weight_decay: ???
       betas: [0.9, 0.999]
     ```
-  - Commit: `feat: create narrow and AdamW variants`
+  - Run `lint_fix` then commit: `feat: create narrow and AdamW variants`
 
 - [ ] **Commit 14**: Create unified callback config
   - Create `configs/callbacks/loss_lin_slope_metrics.yaml`
   - Consolidate all callback settings in one place
   - Update experiment configs to reference it
-  - Commit: `feat: create unified callback configuration`
+  - Run `lint_fix` then commit: `feat: create unified callback configuration`
 
 ## Phase 3: Local Validation (5 commits)
 
@@ -382,7 +382,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         "optim.weight_decay=1e-4"
     ]
     ```
-  - Commit: `feat: create local validation script`
+  - Run `lint_fix` then commit: `feat: create local validation script`
 
 - [ ] **Commit 16**: Add unit tests for validation script
   - Create `tests/test_validate_local.py`
@@ -413,13 +413,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         missing = validator.find_missing_metrics(required, logged)
         assert "loss_slope/grad_norm_periodic" in missing
     ```
-  - Commit: `test: add unit tests for validation script`
+  - Run `lint_fix` then commit: `test: add unit tests for validation script`
 
 - [ ] **Commit 17**: Create test harness
   - Create `scripts/test_harness.py`
   - Test all 4 variants sequentially with machine=mac
   - Report pass/fail for each
-  - Commit: `feat: create test harness for all variants`
+  - Run `lint_fix` then commit: `feat: create test harness for all variants`
 
 - [ ] **Commit 18**: Add unit tests for test harness
   - Create `tests/test_test_harness.py`
@@ -452,7 +452,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         report = harness.generate_report(results)
         assert "1/2 variants failed" in report
     ```
-  - Commit: `test: add unit tests for test harness`
+  - Run `lint_fix` then commit: `test: add unit tests for test harness`
 
 - [ ] **Commit 19**: Create validation notebook and comprehensive tests
   - Create `notebooks/validate_metrics_basic.ipynb`
@@ -490,7 +490,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - GO/NO-GO decision framework:
     - GO if: All frequencies correct AND R² > 0.95 for sample AND no data issues
     - NO-GO if: Missing metrics OR wrong frequencies OR poor fits OR data corruption
-  - Commit: `feat: create metric validation notebook and unit tests`
+  - Run `lint_fix` then commit: `feat: create metric validation notebook and unit tests`
 
 ## Phase 4: Job Management (5 commits)
 
@@ -534,7 +534,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
       --param seed=0,1,2,3,4,5 \
       --dry-run
     ```
-  - Commit: `feat: create submission wrapper for 216-job sweep`
+  - Run `lint_fix` then commit: `feat: create submission wrapper for 216-job sweep`
 
 - [ ] **Commit 21**: Create monitoring script
   - Create `scripts/monitor_experiment.py`
@@ -570,7 +570,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     }
     ```
   - Progress reporting with ETA based on average job runtime
-  - Commit: `feat: create experiment monitoring script`
+  - Run `lint_fix` then commit: `feat: create experiment monitoring script`
 
 - [ ] **Commit 22**: Add unit tests for monitoring script
   - Create `tests/test_monitor_experiment.py`
@@ -618,14 +618,14 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         eta = monitor.calculate_eta(completed_times, remaining_jobs)
         assert 3000 < eta < 3300  # ~10 jobs * ~310 seconds
     ```
-  - Commit: `test: add unit tests for experiment monitoring`
+  - Run `lint_fix` then commit: `test: add unit tests for experiment monitoring`
 
 - [ ] **Commit 23**: Create failure recovery script
   - Create `scripts/recover_failed.py`
   - Detect OOM, timeout, gradient explosion
   - Implement retry logic with parameter adjustment
   - Create `docs/operational_runbook_basic.md`
-  - Commit: `feat: create failure recovery system`
+  - Run `lint_fix` then commit: `feat: create failure recovery system`
 
 - [ ] **Commit 24**: Add unit tests for failure recovery
   - Create `tests/test_recover_failed.py`
@@ -671,7 +671,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         assert "job_id: 123" in entry
         assert "Action taken: reduce batch size" in entry
     ```
-  - Commit: `test: add unit tests for failure recovery`
+  - Run `lint_fix` then commit: `test: add unit tests for failure recovery`
 
 ## Phase 5: Data Pipeline (5 commits)
 
@@ -679,13 +679,13 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Create `scripts/collect_and_archive.sh`
   - Gather results from scratch directory
   - Organize by experiment variant
-  - Commit: `feat: create result collection script`
+  - Run `lint_fix` then commit: `feat: create result collection script`
 
 - [ ] **Commit 26**: Create verification script
   - Create `scripts/verify_completeness.py`
   - Check all 216 runs completed
   - Report missing or failed runs
-  - Commit: `feat: create completeness verification script`
+  - Run `lint_fix` then commit: `feat: create completeness verification script`
 
 - [ ] **Commit 27**: Add unit tests for verification script
   - Create `tests/test_verify_completeness.py`
@@ -711,7 +711,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         assert "214/216 runs completed" in report
         assert "2 runs failed" in report
     ```
-  - Commit: `test: add unit tests for completeness verification`
+  - Run `lint_fix` then commit: `test: add unit tests for completeness verification`
 
 - [ ] **Commit 28**: Create export script
   - Create `scripts/prepare_dataset.py`
@@ -766,7 +766,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     ```
   - Include data dictionary documenting each column in README
   - Save time series data as separate CSV files per run
-  - Commit: `feat: create dataset export script`
+  - Run `lint_fix` then commit: `feat: create dataset export script`
 
 - [ ] **Commit 29**: Add unit tests for export script
   - Create `tests/test_prepare_dataset.py`
@@ -827,7 +827,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         assert "0.000010" in content  # Not 1e-05
         assert "0.000001" in content  # Not 1e-06
     ```
-  - Commit: `test: add unit tests for dataset export`
+  - Run `lint_fix` then commit: `test: add unit tests for dataset export`
 
 ## Phase 6: Cluster Execution (2 commits - MANUAL EXECUTION)
 
@@ -857,7 +857,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
     - Job completion < 30 minutes for 50 epochs
     - Memory usage within RTX8000 48GB limit
   - Verify all variants run successfully with 2 workers per GPU
-  - Commit: `test: verify resource allocation on cluster`
+  - Run `lint_fix` then commit: `test: verify resource allocation on cluster`
 
 - [ ] **Commit 31**: Execute experiment sweep (MANUAL)
   - Step 1: Submit jobs to dr_exp queue using wrapper script:
@@ -923,7 +923,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Collect results using `scripts/collect_and_archive.sh`
   - Verify completeness: All 216 runs should have R² values and slope metrics
   - Document in commit: total runtime, failure rate, resource usage
-  - Commit: `chore: execute 216-job loss slope sweep`
+  - Run `lint_fix` then commit: `chore: execute 216-job loss slope sweep`
 
 ## Additional Implementation Recommendations
 
