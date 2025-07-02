@@ -66,51 +66,6 @@
 - Last completed step: Plan restructured with advanced SLURM features
 - Active agent: ready for implementation
 - Blocked by: none
-- Total commits: 74 atomic commits across 6 phases
-
-## Pre-implementation Checklist
-
-**Environment Verification:**
-- [ ] Confirm deconCNN repository accessibility from implementation session
-- [ ] Verify Python 3.12+ environment active in deconCNN directory  
-- [ ] Verify `uv` package manager availability
-- [ ] Run `uv sync --group all` successfully
-- [ ] Run `pt` and confirm all current tests pass
-- [ ] Check available disk space for notebooks and analysis outputs
-
-**Dependency Verification:**
-- [ ] Add visualization dependencies to pyproject.toml
-- [ ] Verify all new imports work correctly
-- [ ] Test matplotlib backend for headless operation (if needed for cluster)
-
-**Baseline Testing:**
-- [ ] Run existing callbacks on sample data to establish baseline
-- [ ] Document current NoiseMonitor and CurvatureMonitor output formats
-- [ ] Verify existing checkpoints/logs are readable and contain expected metrics
-
-**Integration Validation:**
-- [ ] Check that `dr_exp` integration still works after changes
-- [ ] Verify Hydra configuration system compatibility
-- [ ] Test callback execution overhead is acceptable (<15% as per plan)
-
-## Implementation Steps
-
-**CRITICAL**: Follow Tier 3's atomic commit pattern:
-- Each commit does ONE thing
-- Implementation → Unit Test → Integration Test
-- Run `lint_fix` before EVERY commit
-
-### Phase 0: Environment Setup & Verification
-- [ ] **Precommit**: Verify deconCNN environment
-  - [ ] Ensure deconCNN directory is accessible
-  - [ ] Verify Python 3.12+ with: `uvrp -c "import sys; print(sys.version)"`
-  - [ ] Run `us` to sync dependencies
-  - [ ] Run `pt` to verify existing tests pass
-  - [ ] Run `lint` to check code quality baseline
-  - [ ] Test import: `uvrp -c "import seaborn; print('seaborn OK')"`
-  - [ ] Test imports: `uvrp -c "import plotly, jupyter; print('All imports OK')"`
-  - [ ] Verify `src/deconcnn/analysis/__init__.py`, `scripts/analysis/` and `notebooks/` exist
-
 
 ### Phase 1: Enhanced Mathematical Functions (4 commits)
 - [x] **Commit 1**: Add AIC computation to utils ✅ COMPLETED
@@ -122,34 +77,12 @@
 
 - TODO: verify that the training code outputs CSV
 
-- [ ] **Commit 5**: Implement knee detection
-  - [ ] Create `src/deconcnn/analysis/detection.py`
-  - [ ] Add imports and module structure
-  - [ ] Add `knee_epoch()` function
-  - [ ] Use AIC to compare exponential vs power law
-  - [ ] Return burn-in epoch estimate
-  - [ ] Create `tests/test_detection.py`
-  - [ ] Test with synthetic curves
-  - [ ] Verify burn-in identification
-  - **Commit**: `feat and test: implement AIC-based knee detection`
+- [x] **Commit 5**: Implement knee detection
+- [x] **Commit 6**: Implement windowed slope analysis
+- [x] **Commit 7**: Implement segmented power law fitting
 
-- [ ] **Commit 6**: Implement windowed slope analysis
-  - [ ] Add `alpha_window()` function
-  - [ ] Support flexible window parameters
-  - [ ] Return slope time series
-  - [ ] Unit test window sliding behavior
-  - [ ] Verify slope accuracy per window
-  - **Commit**: `feat and test: implement windowed slope computation`
-
-- [ ] **Commit 7**: Implement segmented power law fitting
-  - [ ] Add `fit_two_power()` to `fitting.py`
-  - [ ] Use dynamic programming for changepoint
-  - [ ] Return both segments and changepoint
-  - [ ] unit test with known two-regime data
-  - [ ] Verify changepoint detection
-  - **Commit**: `feat and test: implement segmented power law fitting`
-
-- [ ] **Commit 8**: Implement Hutch++ algorithm
+- [ ] **Commit 8**: Implement Hutch++ algorithm - IN PROGRESS
+  - Progress: see /Users/daniellerothermel/drotherm/repos/deconCNN/hutchpp_algorithm_reference.md
   - [ ] Create `src/deconcnn/analysis/curvature.py`
   - [ ] Add module structure
   - [ ] Add `hutchpp_trace()` function

@@ -5,24 +5,6 @@ This document provides an atomic implementation plan that gets from 0 to running
 
 **Atomic commits - each commit does ONE thing well, with explicit testing phases.**
 
-## 📁 Repository Architecture
-
-**IMPORTANT**: This implementation follows a deliberate multi-repository architecture:
-
-### Primary Repositories and Their Roles:
-
-1. **deconCNN** (`/Users/daniellerothermel/drotherm/repos/deconCNN/`)
-   - **Role**: Primary implementation repository
-   - **Contains**: All code, callbacks, configurations, and scripts
-   - **Why**: Has existing ML infrastructure, dependencies, and callback framework
-   - **Work here**: 95% of implementation happens here
-
-2. **dr_exp** (`/Users/daniellerothermel/drotherm/repos/dr_exp/`)
-   - **Role**: Experiment tracking infrastructure
-   - **Contains**: Job submission utilities, logging infrastructure
-   - **Why**: Reusable experiment management across projects
-   - **Used via**: Already integrated in deconCNN via dr_exp_callback.py
-
 ## 🎯 CRITICAL SUCCESS FACTORS
 
 1. **Atomic Commits** - Each commit does exactly one thing
@@ -55,13 +37,6 @@ This document provides an atomic implementation plan that gets from 0 to running
    - Use git shortcuts: `gst`, `gd`, `ga .`, `gc -m "msg"`, `glo`
    - Commit messages: imperative mood, describe purpose not implementation
 
-## Current Status
-- Last updated: 2025-07-02
-- Last completed step: Plan fully reviewed
-- Active agent: [none]
-- Blocked by: [none]
-- Plan status: **Ready for implementation - 31 focused commits organized in 6 phases with unit tests**
-
 ## [x] Phase 0: Pre-Implementation Setup
 - [x] **COMPLETE**: Pre-flight validation script created and all checks pass
 
@@ -71,21 +46,10 @@ This document provides an atomic implementation plan that gets from 0 to running
 - [X] **Commit 3**: Create slope calculation in library
 - [x] **Commit 4**: Integration test extracted functions
 
-## Phase 2: Create New Callback (2 commits)
+## [x] Phase 2: Create New Callback (2 commits)
 
 - [x] **Commit 5**: Create LossSlopeLogger using library
-
-- [ ] **Commit 6**: Integration test all callbacks
-  - Test all callbacks together: LossSlopeLogger + DrExpMetricsCallback + CurvatureMonitor + NoiseMonitor
-  - Verify no metric name conflicts
-  - Verify each callback's specific behavior:
-    - LossSlopeLogger: logs every batch, computes slopes after epoch 5
-    - CurvatureMonitor: computes every 500 steps
-    - NoiseMonitor: computes every 2 epochs
-    - DrExpMetricsCallback: logs to dr_exp format
-  - Check total memory usage and performance overhead (<15%)
-  - Test with: `uv run python scripts/train_cnn.py machine=mac epochs=4 batch_size=32 enable_checkpointing=true`
-  - Run `lint_fix` then commit: `test: validate all callbacks integration`
+- [x] **Commit 6**: Integration test all callbacks
 
 ## [x] Phase 3: Experiment Configurations (5 commits)
 
@@ -97,99 +61,10 @@ This document provides an atomic implementation plan that gets from 0 to running
 
 ## Phase 4: Local Validation (5 commits)
 
-- [ ] **Commit 12**: Create validation script
-  - Create `scripts/validate_local.py`:
-    ```python
-    """Validate loss slope experiment configuration locally."""
-    
-    import subprocess
-    import sys
-    from pathlib import Path
-    
-    
-    def validate_single_config():
-        """Run quick validation of single configuration."""
-        cmd = [
-            "uv", "run", "python", "scripts/train_cnn.py",
-            "machine=mac",  # Critical for Mac testing
-            "+experiment=loss_lin_slope_base",
-            "epochs=3",
-            "seed=0",
-            "optim.lr=0.1",
-            "optim.weight_decay=1e-4"
-        ]
-        
-        print(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            print(f"Error: {result.stderr}")
-            return False
-            
-        # Check for expected output patterns
-        output = result.stdout
-        checks = {
-            "loss_slope/alpha_5_15": "loss_slope/alpha_5_15" in output,
-            "grad_norm_periodic": "loss_slope/grad_norm_periodic" in output,
-            "validation frequency": output.count("Validation") >= 12  # 4x per epoch * 3 epochs
-        }
-        
-        print("\nValidation results:")
-        for check, passed in checks.items():
-            print(f"  {check}: {'✓' if passed else '✗'}")
-            
-        return all(checks.values())
-    
-    
-    def main():
-        """Main validation entry point."""
-        print(f"Working directory: {Path.cwd()}")
-        
-        if validate_single_config():
-            print("\n✅ Local validation passed!")
-            return 0
-        else:
-            print("\n❌ Local validation failed!")
-            return 1
-    
-    
-    if __name__ == "__main__":
-        sys.exit(main())
-    ```
-  - Run `lint_fix` then commit: `feat: create local validation script`
+- [x] **Commit 12**: Create validation script
+- [x] **Commit 13**: Add unit tests for validation script
 
-- [ ] **Commit 13**: Add unit tests for validation script
-  - Create `tests/test_validate_local.py`
-  - Test configuration validation:
-    ```python
-    def test_validate_config_structure():
-        """Test that config validation catches missing keys"""
-        config = {"epochs": 3}  # Missing required keys
-        validator = LocalValidator()
-        with pytest.raises(ValueError, match="Missing required"):
-            validator.validate_config(config)
-    ```
-  - Test output format checking:
-    ```python
-    def test_validate_output_format():
-        """Test output format validation"""
-        outputs = {"loss": [1.0, 0.9], "accuracy": [0.5, 0.6]}
-        validator = LocalValidator()
-        assert validator.check_output_format(outputs) is True
-    ```
-  - Test metric presence validation:
-    ```python
-    def test_required_metrics_present():
-        """Test that all required metrics are logged"""
-        required = ["loss_slope/alpha_5_15", "loss_slope/grad_norm_periodic"]
-        logged = {"loss_slope/alpha_5_15": 0.1, "other": 0.2}
-        validator = LocalValidator()
-        missing = validator.find_missing_metrics(required, logged)
-        assert "loss_slope/grad_norm_periodic" in missing
-    ```
-  - Run `lint_fix` then commit: `test: add unit tests for validation script`
-
-- [ ] **Commit 14**: Create test harness
+- [ ] **Commit 14**: Create test harness - IN PROGRESS
   - Create `scripts/test_harness.py`
   - Test all 4 variants sequentially with machine=mac
   - Report pass/fail for each
