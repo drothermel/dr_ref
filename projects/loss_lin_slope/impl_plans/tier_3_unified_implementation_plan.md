@@ -739,22 +739,33 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         'hutch_trace_trajectory',  # Every 500 steps
     ]
     ```
-  - Create Parquet schema with metadata:
+  - Create CSV export with proper data types:
     ```python
-    import pyarrow as pa
-    schema = pa.schema([
-        ('run_id', pa.string()),
-        ('variant', pa.string()),
-        ('seed', pa.int32()),
-        ('lr', pa.float32()),
-        ('weight_decay', pa.float32()),
-        ('r_squared', pa.float32()),
-        ('alpha_early', pa.float32()),
-        ('best_val_ce', pa.float32()),
-        # ... etc
-    ])
+    def export_results(data, output_path):
+        """Export to CSV with proper data types"""
+        df = pd.DataFrame(data)
+        
+        # Ensure proper types
+        df['seed'] = df['seed'].astype(int)
+        df['lr'] = df['lr'].astype(float)
+        df['weight_decay'] = df['weight_decay'].astype(float)
+        df['r_squared'] = df['r_squared'].astype(float)
+        
+        # Save with explicit float format to avoid scientific notation
+        df.to_csv(output_path, index=False, float_format='%.6f')
+        
+        # Also save metadata
+        metadata = {
+            'total_runs': len(df),
+            'export_date': datetime.now().isoformat(),
+            'columns': list(df.columns),
+            'column_types': {col: str(df[col].dtype) for col in df.columns}
+        }
+        with open(output_path.replace('.csv', '_metadata.json'), 'w') as f:
+            json.dump(metadata, f, indent=2)
     ```
-  - Include data dictionary documenting each column
+  - Include data dictionary documenting each column in README
+  - Save time series data as separate CSV files per run
   - Commit: `feat: create dataset export script`
 
 - [ ] **Commit 29**: Add unit tests for export script
@@ -779,17 +790,42 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
         assert isinstance(converted["seed"], int)
         assert converted["r_squared"] == 0.98
     ```
-  - Test parquet export:
+  - Test CSV export:
     ```python
-    def test_export_to_parquet():
-        """Test parquet file generation"""
+    def test_export_to_csv():
+        """Test CSV file generation"""
         exporter = DatasetExporter()
         test_data = [{"run_id": "1", "lr": 0.1, "seed": 0}]
-        output_path = exporter.export_parquet(test_data, "test.parquet")
+        output_path = Path("test_results.csv")
+        exporter.export_results(test_data, output_path)
+        
+        # Verify CSV exists and can be read
         assert output_path.exists()
-        # Verify can be read back
-        df = pd.read_parquet(output_path)
+        df = pd.read_csv(output_path)
         assert len(df) == 1
+        assert df.iloc[0]['lr'] == 0.1
+        
+        # Verify metadata file exists
+        metadata_path = output_path.with_suffix('').with_suffix('_metadata.json')
+        assert metadata_path.exists()
+        with open(metadata_path) as f:
+            metadata = json.load(f)
+        assert metadata['total_runs'] == 1
+    ```
+  - Test float formatting:
+    ```python
+    def test_float_formatting():
+        """Test that floats avoid scientific notation"""
+        exporter = DatasetExporter()
+        test_data = [{"lr": 0.00001, "weight_decay": 1e-6}]
+        output_path = Path("test_floats.csv")
+        exporter.export_results(test_data, output_path)
+        
+        # Read as text to check formatting
+        with open(output_path) as f:
+            content = f.read()
+        assert "0.000010" in content  # Not 1e-05
+        assert "0.000001" in content  # Not 1e-06
     ```
   - Commit: `test: add unit tests for dataset export`
 
@@ -797,32 +833,31 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 
 **Note: These commits require cluster access and will be executed manually**
 
-- [ ] **Commit 30**: Resource testing (MANUAL)
-  - Create `scripts/test_resource_configs.py`
-  - Define expected resource profiles:
+- [ ] **Commit 30**: Resource verification (MANUAL)
+  - Create `scripts/verify_resource_config.py`
+  - Define resource profiles (fixed at 2 workers per GPU):
     ```python
     RESOURCE_PROFILES = {
-        'base': {'gpu_memory_gb': 4, 'optimal_workers': 3},
-        'bn_off': {'gpu_memory_gb': 5, 'optimal_workers': 2},  # More memory, less stable
-        'narrow': {'gpu_memory_gb': 2, 'optimal_workers': 4},  # 0.5x width = less memory
-        'adamw': {'gpu_memory_gb': 6, 'optimal_workers': 2},   # Optimizer states need memory
+        'base': {'gpu_memory_gb': 4, 'workers': 2},
+        'bn_off': {'gpu_memory_gb': 5, 'workers': 2},  # More memory, less stable
+        'narrow': {'gpu_memory_gb': 2, 'workers': 2},  # 0.5x width = less memory
+        'adamw': {'gpu_memory_gb': 6, 'workers': 2},   # Optimizer states need memory
     }
     ```
-  - Test protocol:
+  - Verification protocol:
     ```python
-    TEST_CONFIGS = [
-        {'workers': 2, 'variants': ['base', 'bn_off', 'adamw']},
-        {'workers': 3, 'variants': ['base', 'narrow']},
-        {'workers': 4, 'variants': ['narrow']},
-    ]
+    VERIFY_CONFIG = {
+        'workers': 2,  # Fixed for all variants
+        'variants': ['base', 'bn_off', 'narrow', 'adamw']
+    }
     ```
   - Success criteria:
-    - No OOM errors
+    - No OOM errors with 2 workers per GPU
     - GPU utilization > 80%
     - Job completion < 30 minutes for 50 epochs
     - Memory usage within RTX8000 48GB limit
-  - Document optimal workers per variant in commit message
-  - Commit: `test: determine resource allocation on cluster`
+  - Verify all variants run successfully with 2 workers per GPU
+  - Commit: `test: verify resource allocation on cluster`
 
 - [ ] **Commit 31**: Execute experiment sweep (MANUAL)
   - Run submission using wrapper script:
@@ -931,7 +966,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 - [ ] No missing metrics or frequencies
 - [ ] CSV export successful for Tier 4
 - [ ] Checkpoints ~44MB each
-- [ ] Dataset in Parquet format
+- [ ] Dataset in CSV format with metadata JSON
 - [ ] Handoff documentation complete
 
 ## Key Technical Details
@@ -946,10 +981,11 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - alpha_full: from burn-in (CE ≤ 1.0) to current
 
 ### Resource Configuration:
-- **Base variant**: 3 workers per GPU (~4GB each)
-- **BN-off variant**: 2 workers per GPU (~5GB each, gradient clipping overhead)
-- **Narrow variant**: 4 workers per GPU (~2GB each, 0.5x width)
-- **AdamW variant**: 2 workers per GPU (~6GB each, optimizer states)
+- **All variants**: 2 workers per GPU (fixed configuration)
+- **Base variant**: ~4GB per worker
+- **BN-off variant**: ~5GB per worker (gradient clipping overhead)
+- **Narrow variant**: ~2GB per worker (0.5x width)
+- **AdamW variant**: ~6GB per worker (optimizer states)
 
 ### Critical Paths:
 - **Working directory**: `/Users/daniellerothermel/drotherm/repos/deconCNN`
@@ -984,7 +1020,7 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
 
 ## Risk Mitigations
 
-1. **Memory Issues**: Variant-specific worker counts from testing
+1. **Memory Issues**: Fixed 2 workers per GPU for all variants
 2. **Gradient Explosions**: grad_clip_norm=1.0 for BN-off
 3. **Data Loss**: Checkpoint frequently, dual format logging
 4. **Incomplete Runs**: Recovery script with adaptive strategies
