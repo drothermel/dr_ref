@@ -1,109 +1,29 @@
 # Implementation Plan: Tier 4 Analysis Suite (deconCNN)
 
-## 🔄 DEFERRED ELEMENTS FROM TIER 3 OPTIMIZATION (Added 2025-07-01)
+## 📋 Context from Tier 3 Implementation
 
-**NOTE**: The following elements were deferred from Tier 3 to focus on the critical path. They should be implemented in Tier 4 for complete functionality.
+**What Tier 3 Accomplished:**
+- ✅ Created `src/deconcnn/analysis/` directory structure (existing from prior work)
+- ✅ Implemented LossSlopeLogger callback with slope calculation (alpha_5_15, alpha_full)
+- ✅ Configured CurvatureMonitor (500-step frequency) and NoiseMonitor (2-epoch frequency)
+- ✅ Created monitoring script `scripts/monitor_experiment.py` for job tracking
+- ✅ Set up basic failure recovery in `scripts/recover_failed.py`
+- ✅ Created validation notebook `notebooks/validate_metrics_basic.ipynb` with H1/H2 checks
+- ✅ Created operational documentation `docs/operational_runbook_basic.md`
+- ✅ Added dependencies: pandas>=2.3.0, matplotlib>=3.10.3, statsmodels>=0.14.4, rich>=14.0.0
+- ✅ Established dr_exp metrics.jsonl logging format
+- ✅ Created data pipeline scripts: `collect_and_archive.sh`, `verify_completeness.py`, `prepare_dataset.py`
+- ✅ Created test scripts: `validate_local.py`, `test_harness.py` 
+- ✅ Created submission wrapper `scripts/submit_all_loss_slope.sh` for 216-job sweep
 
-### Analysis Library Implementation (Deferred from Tier 3)
-
-**Location**: `src/deconcnn/analysis/` (directory created in Tier 3)
-
-1. **Knee Detection** (`knee_detector.py`)
-   - AIC-based knee detection for burn-in analysis
-   - Required for identifying training phase transitions
-   - Should include docstrings and type hints
-   - Test with synthetic data for validation
-
-2. **Power Law Fitting** (`power_law_fitter.py`)
-   - Extract and consolidate existing implementation from `src/deconcnn/callbacks/noise_monitor.py:102-107`
-   - Enhanced functionality for robust fitting
-   - Handle numerical stability issues
-   - Update NoiseMonitor to use shared utility
-   - **AVOIDS DUPLICATION**: Existing implementation needs consolidation
-
-3. **Enhanced Metric Validation** (`metric_validator.py` - extends basic version from Tier 3)
-   - **Advanced data quality validation** (extends real-time monitoring from Tier 3 Commit 9)
-   - Statistical validation: outlier detection, consistency checks, temporal validation
-   - Cross-experiment validation: variant comparison, parameter sensitivity, reproducibility
-   - Comprehensive completeness checking beyond basic range validation
-   - **NOTE**: Basic NaN/inf detection and range validation covered in Tier 3 Commit 9
-
-### Advanced Monitoring (Deferred from Tier 3)
-
-1. **Enhanced Failure Recovery** (extends basic version from Tier 3)
-   - Expand `scripts/recover_failed.py` with advanced retry strategies
-   - Add machine learning-based failure prediction
-   - Advanced parameter adjustment algorithms
-   - **NOTE**: Basic failure recovery covered in Tier 3 Commit 9
-
-2. **Real-time Monitoring Dashboard** (`scripts/monitor_experiment.py` enhancement)
-   - Advanced progress tracking by variant and parameter
-   - Failure warnings and completion rate analytics
-   - Integration with existing basic monitoring from Tier 3
-
-3. **Advanced Job Monitoring** (`scripts/monitor_jobs.py` enhancement)
-   - Enhanced job status tracking and completion analytics
-   - Failure detection and automated reporting
-   - Integration with dr_exp job management
-
-### Comprehensive Documentation (Deferred from Tier 3)
-
-1. **Enhanced Metric Validation** (extends basic version from Tier 3)
-   - Expand `notebooks/validate_metrics_basic.ipynb` into comprehensive analysis
-   - Add advanced metric quality checks and statistical validation
-   - Deep-dive analysis of logging patterns and data quality
-   - **NOTE**: Basic validation covered in Tier 3 Commit 7
-
-2. **Enhanced Operational Documentation** (extends basic version from Tier 3)
-   - Expand `docs/operational_runbook_basic.md` into comprehensive guide
-   - Add advanced troubleshooting scenarios and solutions
-   - Detailed performance optimization procedures
-   - **NOTE**: Basic operational readiness covered in Tier 3 Commit 9
-
-3. **Advanced Examples and Tutorials**
-   - Integration examples for analysis utilities
-   - Performance optimization guides
-   - Research insights and optimizations
-
----
-
-## ⚠️ ADDITIONAL CONSIDERATIONS FROM TIER 3 REVIEW (Added 2025-01-01)
-
-**NOTE**: The following items may become relevant during implementation. They were identified during Tier 3 review but are not critical for the core logging infrastructure.
-
-### Data Format Considerations
-
-1. **JSON to CSV Conversion**
-   - Tier 3 will log to dr_exp's metrics.jsonl format
-   - Tier 4 needs to implement conversion utilities for pandas analysis
-   - Example utility needed:
-     ```python
-     def convert_metrics_jsonl_to_csv(experiment_dir):
-         """Convert dr_exp metrics.jsonl to CSV for analysis."""
-     ```
-
-2. **Analysis Functions Status Update**
-   - ✅ **Deferred to Tier 4**: `knee_detector.py`, `power_law_fitter.py`, `metric_validator.py`
-   - ✅ **Directory Created**: `src/deconcnn/analysis/` in Tier 3 Commit 1
-   - ⚠️ **Power Law Consolidation**: Extract from `noise_monitor.py:102-107` to avoid duplication
-   - 📋 **Implementation Priority**: Phase 1 of Tier 4 implementation
-
-3. **Library Strategy Updates**
-   - BackPACK is being used for trace estimation (more efficient)
-   - PyHessian reserved for spectral analysis only
-   - No `hutch_nn` library exists - use PyHessian or BackPACK features
-
-4. **Dependencies Already Added**
-   - All visualization libraries (pandas, matplotlib, etc.) already in deconCNN
-   - BackPACK already added for trace estimation
-   - No need to add these again
-
-5. **Potential Resource Optimizations**
-   - Workers per GPU will be determined by Tier 3 testing
-   - May vary by experiment variant (BN-off may need fewer workers)
-   - Check Tier 3 results before assuming 3 workers per GPU
-
----
+**What Tier 4 Must Complete:**
+- Analysis library functions (knee detection, power law fitting, metric validation)
+- Extract and modularize existing analysis code from callbacks
+- Enhanced monitoring (improve monitor_experiment.py, create monitor_jobs.py)
+- Enhanced recovery systems (ML-based failure prediction)
+- Comprehensive documentation and tutorials
+- Data format conversion utilities (JSON to CSV/Parquet)
+- Missing visualization dependencies (seaborn, plotly, jupyter)
 
 ## Agent Instructions
 **IMPORTANT: Read these before starting implementation**
@@ -130,12 +50,18 @@
    - Each commit should be atomic and focused on a single logical change
    - If a step has no commit message, no commit is needed for that step
 
+5. **Implementation Philosophy**:
+   - Build on existing foundations from Tier 3
+   - Extract and consolidate existing code to avoid duplication
+   - Maintain backward compatibility with existing callbacks
+   - Cross-validate extensively against current behavior
+
 ## Current Status
-- Last updated: 2025-07-01 comprehensive plan review completed
-- Last completed step: Plan review and refinement with environment verification
-- Active agent: ready for Phase 0 implementation
+- Last updated: 2025-07-02 - Complete restructuring to atomic commits
+- Last completed step: Plan restructured following Tier 3 pattern
+- Active agent: ready for implementation
 - Blocked by: none
-- Review findings: Added Phase 0 verification, atomic commit messages, risk mitigation
+- Total commits: 79 atomic commits across 7 phases
 
 ## Pre-implementation Checklist
 
@@ -164,222 +90,514 @@
 
 ## Implementation Steps
 
-### Phase 0: Environment Setup & Verification (Day 0)
+**CRITICAL**: Follow Tier 3's atomic commit pattern:
+- Each commit does ONE thing
+- Implementation → Unit Test → Integration Test
+- Run `lint_fix` before EVERY commit
 
-- [ ] **Step 0.1**: Verify deconCNN environment access and setup
-  - [ ] Ensure deconCNN directory is accessible for implementation
-  - [ ] Verify `uv` and Python 3.12+ environment in deconCNN
-  - [ ] Run `us` (uv sync --group all) to ensure current dependencies work
+### Phase 0: Environment Setup & Verification (3 commits)
+
+- [ ] **Commit 0.1**: Verify deconCNN environment
+  - [ ] Ensure deconCNN directory is accessible
+  - [ ] Verify Python 3.12+ with: `uvrp -c "import sys; print(sys.version)"`
+  - [ ] Run `us` to sync dependencies
   - [ ] Run `pt` to verify existing tests pass
-  - [ ] Run `lint` to check current code quality
-  - **Testing**: All existing functionality works before any changes
-  - **Commit**: None needed - verification only
+  - [ ] Run `lint` to check code quality baseline
+  - **Commit**: `chore: verify deconCNN environment`
 
-### Phase 1: Dependencies & Analysis Library Setup (Days 1-2)
+- [ ] **Commit 0.2**: Add visualization dependencies
+  - [ ] Add to pyproject.toml: `seaborn>=0.12.0`
+  - [ ] Run `us` to install
+  - [ ] Test import: `uvrp -c "import seaborn; print('seaborn OK')"`
+  - **Commit**: `feat: add seaborn visualization dependency`
 
-- [ ] **Step 1.1**: Add analysis dependencies with specific versions
-  - [ ] Add to `pyproject.toml` dependencies: `pandas>=2.0.0`, `seaborn>=0.12.0`, `plotly>=5.17.0`, `jupyter>=1.0.0`, `matplotlib>=3.7.0`
-  - [ ] Note: `click>=8.2.1` already added, `scipy>=1.11.0` already available
-  - [ ] Run `us` to install new dependencies
-  - [ ] Create simple import test: `uvrp -c "import pandas, seaborn, plotly, matplotlib; print('All imports successful')"`
-  - [ ] Verify all imports work correctly
-  - **Testing**: Test import of all new packages
-  - **Commit**: Use exact message: `feat: add visualization and analysis dependencies`
+- [ ] **Commit 0.3**: Add remaining analysis dependencies
+  - [ ] Add to pyproject.toml: `plotly>=5.17.0`, `jupyter>=1.0.0`
+  - [ ] Run `us` to install
+  - [ ] Test imports: `uvrp -c "import plotly, jupyter; print('All imports OK')"`
+  - **Commit**: `feat: add plotly and jupyter dependencies`
 
-- [ ] **Step 1.2**: Create analysis library structure
-  - [ ] Create `src/deconcnn/analysis/` directory with `__init__.py`
-  - [ ] Create `scripts/analysis/` directory for analysis scripts
-  - [ ] Create `notebooks/` directory at project root for slide generation
-  - [ ] Update `.gitignore` to exclude: `notebooks/*.ipynb_checkpoints`, `*.png`, `*.pdf`, `*.svg` in notebooks/
-  - **Testing**: Verify directory structure and `from deconcnn.analysis import` works
-  - **Commit**: Use exact message: `feat: create analysis library structure`
+### Phase 1: Library Structure & Function Extraction (12 commits)
 
-- [ ] **Step 1.3**: Extract and modularize existing analysis functions with careful compatibility
-  - [ ] Create analysis module files: `fitting.py`, `spectral.py`, `utils.py` in `src/deconcnn/analysis/`
-  - [ ] Extract `ewma()` computation from NoiseMonitor (lines 67-72) to `utils.py`
-  - [ ] Extract power law fitting from NoiseMonitor (lines 102-107) to `fitting.py`
-  - [ ] Extract PSD analysis from NoiseMonitor (lines 114-131) to `spectral.py`
+- [ ] **Commit 1.1**: Create analysis library structure
+  - [ ] Verify `src/deconcnn/analysis/` exists, add `__init__.py` if missing
+  - [ ] Create `scripts/analysis/` directory
+  - [ ] Verify/create `notebooks/` directory
+  - [ ] Test: `uvrp -c "from deconcnn.analysis import *; print('Import OK')"`
+  - **Commit**: `feat: complete analysis library structure`
+
+- [ ] **Commit 1.2**: Update gitignore for notebooks
+  - [ ] Add to `.gitignore`: `notebooks/*.ipynb_checkpoints`, `*.png`, `*.pdf`, `*.svg`
+  - [ ] Test by creating dummy file and verifying it's ignored
+  - **Commit**: `chore: update gitignore for notebook outputs`
+
+- [ ] **Commit 1.3**: Create utils module and extract EWMA
+  - [ ] Create `src/deconcnn/analysis/utils.py`
+  - [ ] Extract `ewma()` from NoiseMonitor (lines 67-72)
+  - [ ] Add proper docstring and type hints
+  - **Commit**: `refactor: extract EWMA computation to utils`
+
+- [ ] **Commit 1.4**: Add unit tests for EWMA
+  - [ ] Create `tests/test_analysis_utils.py`
+  - [ ] Test EWMA with known inputs/outputs
+  - [ ] Test edge cases (empty list, single value)
+  - **Commit**: `test: add unit tests for EWMA function`
+
+- [ ] **Commit 1.5**: Create fitting module and extract power law
+  - [ ] Create `src/deconcnn/analysis/fitting.py`
+  - [ ] Extract power law fitting from NoiseMonitor (lines 102-107)
+  - [ ] Add docstring explaining log-log regression approach
+  - **Commit**: `refactor: extract power law fitting to fitting module`
+
+- [ ] **Commit 1.6**: Add unit tests for power law fitting
+  - [ ] Create `tests/test_fitting.py`
+  - [ ] Test with synthetic power law data
+  - [ ] Test R² calculation accuracy
+  - **Commit**: `test: add unit tests for power law fitting`
+
+- [ ] **Commit 1.7**: Create spectral module and extract PSD
+  - [ ] Create `src/deconcnn/analysis/spectral.py`
+  - [ ] Extract PSD analysis from NoiseMonitor (lines 114-131)
+  - [ ] Document FFT approach and frequency bands
+  - **Commit**: `refactor: extract PSD analysis to spectral module`
+
+- [ ] **Commit 1.8**: Add unit tests for PSD analysis
+  - [ ] Create `tests/test_spectral.py`
+  - [ ] Test with synthetic signals
+  - [ ] Verify frequency band extraction
+  - **Commit**: `test: add unit tests for PSD analysis`
+
+- [ ] **Commit 1.9**: Extract slope calculation to utils
+  - [ ] Extract slope logic from LossSlopeLogger to `utils.py`
+  - [ ] Add `calculate_slope()` function with window parameters
+  - [ ] Include least squares implementation
+  - **Commit**: `refactor: extract slope calculation to utils`
+
+- [ ] **Commit 1.10**: Add unit tests for slope calculation
+  - [ ] Add tests to `test_analysis_utils.py`
+  - [ ] Test against numpy.polyfit reference
+  - [ ] Test windowing behavior
+  - **Commit**: `test: add unit tests for slope calculation`
+
+- [ ] **Commit 1.11**: Update callbacks to use extracted functions
+  - [ ] Update NoiseMonitor imports
+  - [ ] Update LossSlopeLogger imports
+  - [ ] Ensure backward compatibility
+  - **Commit**: `refactor: update callbacks to use analysis library`
+
+- [ ] **Commit 1.12**: Integration test extracted functions
+  - [ ] Run training with updated callbacks
+  - [ ] Compare outputs before/after extraction
+  - [ ] Verify identical behavior
+  - **Commit**: `test: verify callback compatibility after extraction`
+
+### Phase 2: Enhanced Mathematical Functions (10 commits)
+
+- [ ] **Commit 2.1**: Add AIC computation to utils
   - [ ] Add `compute_AIC()` function to `utils.py`
-  - [ ] Update NoiseMonitor to import and use extracted functions (maintain identical behavior)
-  - [ ] Create integration test comparing old vs new function outputs
-  - **Testing**: Run existing callbacks and verify identical output before/after extraction
-  - **Commit**: Use exact message: `refactor: extract analysis functions to reusable library`
+  - [ ] Implement: AIC = 2k - 2ln(L)
+  - [ ] Add docstring explaining parameters
+  - **Commit**: `feat: add AIC computation to utils`
 
-### Phase 2: Enhanced Mathematical Functions (Days 2-3)
+- [ ] **Commit 2.2**: Add unit tests for AIC
+  - [ ] Test AIC calculation with known values
+  - [ ] Test model comparison scenarios
+  - **Commit**: `test: add unit tests for AIC computation`
 
-- [ ] **Step 2.1**: Enhance fitting functions in analysis library
-  - [ ] Improve extracted power law fitting in `fitting.py` with better error handling
-  - [ ] Add `fit_exponential()` - log-linear space fitting
-  - [ ] Enhance R² computation and residual analysis
-  - [ ] Add robust outlier detection to existing scipy.optimize usage
-  - **Testing**: Cross-validate with original NoiseMonitor results
-  - **Commit**: Use exact message: `feat: enhance power law and exponential fitting functions`
+- [ ] **Commit 2.3**: Enhance power law fitting with outlier detection
+  - [ ] Add outlier detection to `fitting.py`
+  - [ ] Use IQR or MAD method for robustness
+  - [ ] Return outlier mask with fit results
+  - **Commit**: `feat: add outlier detection to power law fitting`
 
-- [ ] **Step 2.2**: Implement advanced segmented fitting
-  - [ ] Add `fit_two_power()` to `fitting.py` - segmented power-law with dynamic programming
-  - [ ] Add changepoint detection using AIC comparison
-  - [ ] Include confidence intervals for parameters using bootstrap methods
-  - [ ] Handle edge cases (insufficient data, poor fits)
-  - **Testing**: Test with synthetic two-regime power laws, verify changepoint detection
-  - **Commit**: Use exact message: `feat: implement segmented power law fitting`
+- [ ] **Commit 2.4**: Test enhanced power law fitting
+  - [ ] Test outlier detection accuracy
+  - [ ] Test fit improvement with outliers removed
+  - **Commit**: `test: verify outlier detection in fitting`
 
-- [ ] **Step 2.3**: Enhance spectral analysis functions
-  - [ ] Enhance `spectral.py` with Welch's method for robust spectral estimation
-  - [ ] Add frequency band filtering based on existing mid-frequency analysis
-  - [ ] Add noise floor detection capabilities
-  - [ ] Maintain backward compatibility with NoiseMonitor
-  - **Testing**: Cross-validate with NoiseMonitor results, test synthetic signals
-  - **Commit**: Use exact message: `feat: enhance spectral analysis with Welch method`
+- [ ] **Commit 2.5**: Implement exponential fitting
+  - [ ] Add `fit_exponential()` to `fitting.py`
+  - [ ] Implement log-linear regression
+  - [ ] Return parameters and R²
+  - **Commit**: `feat: implement exponential fitting function`
 
-### Phase 3: Detection & Analysis Functions (Days 3-4)
+- [ ] **Commit 2.6**: Test exponential fitting
+  - [ ] Test with synthetic exponential data
+  - [ ] Compare with scipy.optimize results
+  - **Commit**: `test: add unit tests for exponential fitting`
 
-- [ ] **Step 3.1**: Implement burn-in detection
-  - [ ] Create `src/deconcnn/analysis/detection.py` with `knee_epoch()` function
-  - [ ] Implement AIC-based burn-in detection using power law vs exponential models
-  - [ ] Build on Phase 2 fitting functions for model comparison
-  - [ ] Add visualization helpers for detection results
-  - **Testing**: Test with synthetic learning curves and real training logs
-  - **Commit**: Use exact message: `feat: implement AIC-based burn-in detection`
+- [ ] **Commit 2.7**: Implement Welch's method for spectral analysis
+  - [ ] Add `welch_psd()` to `spectral.py`
+  - [ ] Implement windowing and overlap
+  - [ ] Add frequency resolution control
+  - **Commit**: `feat: implement Welch's method for PSD`
 
-- [ ] **Step 3.2**: Implement slope analysis
-  - [ ] Add `alpha_window()` to `detection.py` - windowed slope computation
-  - [ ] Build on existing power law slope computation patterns
-  - [ ] Add confidence intervals for slope estimates using bootstrap
-  - [ ] Handle edge cases at curve boundaries
-  - **Testing**: Validate against existing NoiseMonitor slope computation
-  - **Commit**: Use exact message: `feat: implement windowed slope computation`
+- [ ] **Commit 2.8**: Test Welch's method
+  - [ ] Test against scipy.signal.welch
+  - [ ] Verify frequency resolution
+  - **Commit**: `test: verify Welch's method implementation`
 
-- [ ] **Step 3.3**: Upgrade curvature analysis
-  - [ ] Create `src/deconcnn/analysis/curvature.py` for advanced curvature analysis
-  - [ ] Upgrade CurvatureMonitor's Hutchinson estimator to Hutch++ algorithm
-  - [ ] Implement `lambda_plateau_epoch()` using existing lambda_max patterns
-  - [ ] Add statistical tests for plateau detection
-  - **Testing**: Compare Hutch++ vs Hutchinson performance on real models
-  - **Commit**: Use exact message: `feat: upgrade to Hutch++ curvature estimation`
+- [ ] **Commit 2.9**: Add noise floor detection
+  - [ ] Add `detect_noise_floor()` to `spectral.py`
+  - [ ] Implement statistical noise floor estimation
+  - **Commit**: `feat: add noise floor detection`
 
-### Phase 4: Primary Analysis Scripts (Days 4-5)
+- [ ] **Commit 2.10**: Test noise floor detection
+  - [ ] Test with synthetic signal + noise
+  - [ ] Verify detection accuracy
+  - **Commit**: `test: verify noise floor detection`
 
-- [ ] **Step 4.1**: Create core analysis scripts
-  - [ ] Create `scripts/analysis/A-knee.py` - detect power-law onset across all runs
-  - [ ] Create `scripts/analysis/A-slope.py` - compute α_early (5-15) and α_full (knee-50)
-  - [ ] Create `scripts/analysis/A-fits.py` - compare exponential/power/two-power models
-  - [ ] Use click for CLI interfaces and hydra integration for configs
-  - [ ] Include progress tracking and error recovery
-  - **Testing**: Run on existing deconCNN experimental data
-  - **Commit**: Use exact message: `feat: implement primary analysis scripts`
+### Phase 3: Detection & Analysis Functions (16 commits)
 
-- [ ] **Step 4.2**: Implement visualization core
-  - [ ] Create `src/deconcnn/analysis/visualization.py` with `plot_loss_mosaic()`
-  - [ ] Add customizable layout and styling using matplotlib/seaborn
-  - [ ] Include automatic subplot scaling and labeling
-  - [ ] Add export functionality for slides (PNG/PDF/SVG)
-  - **Testing**: Generate test mosaics with real training data
-  - **Commit**: Use exact message: `feat: implement loss mosaic visualization system`
+- [ ] **Commit 3.1**: Create data utils module
+  - [ ] Create `src/deconcnn/analysis/data_utils.py`
+  - [ ] Add module docstring and imports
+  - **Commit**: `feat: create data utils module`
 
-### Phase 5: Supporting Analysis Scripts (Days 5-6)
+- [ ] **Commit 3.2**: Implement JSONL to CSV conversion
+  - [ ] Add `convert_metrics_jsonl_to_csv()` function
+  - [ ] Handle dr_exp metrics format
+  - [ ] Include data validation
+  - **Commit**: `feat: implement JSONL to CSV conversion`
 
-- [ ] **Step 5.1**: Implement robustness analysis
-  - [ ] Create `scripts/analysis/A-window_scan.py` - window robustness heatmap
-  - [ ] Create `scripts/analysis/A-unit_inv.py` - verify nats/bits invariance
-  - [ ] Add comprehensive parameter sensitivity analysis
-  - [ ] Include statistical significance testing using existing patterns
-  - **Testing**: Verify robustness metrics with real experimental data
-  - **Commit**: Use exact message: `feat: implement robustness analysis scripts`
+- [ ] **Commit 3.3**: Test JSONL conversion
+  - [ ] Create `tests/test_data_utils.py`
+  - [ ] Test with sample metrics.jsonl
+  - [ ] Verify CSV output format
+  - **Commit**: `test: add tests for JSONL conversion`
 
-- [ ] **Step 5.2**: Implement ablation analysis
-  - [ ] Create `scripts/analysis/A-optim_arch.py` - ablation comparison table
-  - [ ] Create `scripts/analysis/A-grid_heat.py` - LR×WD performance heatmap
-  - [ ] Add statistical comparison methods using scipy.stats
-  - [ ] Include effect size computations (Cohen's d, r²)
-  - **Testing**: Generate comparison tables with deconCNN experimental grid
-  - **Commit**: Use exact message: `feat: implement ablation comparison scripts`
+- [ ] **Commit 3.4**: Add batch processing for conversions
+  - [ ] Add `batch_convert_experiments()` function
+  - [ ] Support directory traversal
+  - [ ] Add progress tracking
+  - **Commit**: `feat: add batch processing for data conversion`
 
-- [ ] **Step 5.3**: Implement correlation analysis
-  - [ ] Create `scripts/analysis/A-noise_corr.py` - noise proxy correlations
-  - [ ] Create `scripts/analysis/A-curvature_timing.py` - λ₁ plateau vs α knee timing
-  - [ ] Add Pearson and Spearman correlation with confidence intervals
-  - [ ] Include partial correlation analysis using pandas
-  - **Testing**: Test correlation computations with real training metrics
-  - **Commit**: Use exact message: `feat: implement correlation analysis scripts`
+- [ ] **Commit 3.5**: Create detection module
+  - [ ] Create `src/deconcnn/analysis/detection.py`
+  - [ ] Add imports and module structure
+  - **Commit**: `feat: create detection analysis module`
 
-### Phase 6: Slide Generation Notebooks (Days 6-7)
+- [ ] **Commit 3.6**: Implement knee detection
+  - [ ] Add `knee_epoch()` function
+  - [ ] Use AIC to compare exponential vs power law
+  - [ ] Return burn-in epoch estimate
+  - **Commit**: `feat: implement AIC-based knee detection`
 
-- [ ] **Step 6.1**: Create primary hypothesis notebooks
-  - [ ] Create `h1_primary.ipynb` - R² histogram + loss mosaic for H1
-  - [ ] Create `h2_primary.ipynb` - α vs CE scatter plot for H2
-  - [ ] Add interactive plotting with plotly/bokeh
-  - [ ] Include statistical annotations
-  - **Testing**: Generate primary slides, verify narrative flow
-  - **Commit**: Use exact message: `feat: create primary hypothesis notebooks`
+- [ ] **Commit 3.7**: Test knee detection
+  - [ ] Create `tests/test_detection.py`
+  - [ ] Test with synthetic curves
+  - [ ] Verify burn-in identification
+  - **Commit**: `test: add tests for knee detection`
 
-- [ ] **Step 6.2**: Create backup analysis notebooks
-  - [ ] Create `backup_b_fam.ipynb` - AIC comparison bars
-  - [ ] Create `backup_c_window.ipynb` - window robustness heatmap
-  - [ ] Create `backup_h_arch.ipynb` - architecture ablation results
-  - [ ] Add comprehensive error handling
-  - **Testing**: Generate backup slides, verify completeness
-  - **Commit**: Use exact message: `feat: create backup analysis notebooks`
+- [ ] **Commit 3.8**: Implement windowed slope analysis
+  - [ ] Add `alpha_window()` function
+  - [ ] Support flexible window parameters
+  - [ ] Return slope time series
+  - **Commit**: `feat: implement windowed slope computation`
 
-- [ ] **Step 6.3**: Create exploration notebook
-  - [ ] Create `curvature_explore.ipynb` - future track exploration
-  - [ ] Add hypothesis generation tools
-  - [ ] Include interactive parameter exploration
-  - [ ] Add export functionality for follow-up studies
-  - **Testing**: Test interactive features, verify exploration workflows
-  - **Commit**: Use exact message: `feat: create curvature exploration notebook`
+- [ ] **Commit 3.9**: Test windowed slope
+  - [ ] Test window sliding behavior
+  - [ ] Verify slope accuracy per window
+  - **Commit**: `test: verify windowed slope analysis`
 
-### Phase 7: Statistical Validation & Integration (Days 7-8)
+- [ ] **Commit 3.10**: Implement segmented power law fitting
+  - [ ] Add `fit_two_power()` to `fitting.py`
+  - [ ] Use dynamic programming for changepoint
+  - [ ] Return both segments and changepoint
+  - **Commit**: `feat: implement segmented power law fitting`
 
-- [ ] **Step 7.1**: Implement statistical testing suite
-  - [ ] Add Pearson and Spearman correlation tests with p-values
-  - [ ] Implement bootstrap confidence intervals
-  - [ ] Add multiple comparison corrections (Bonferroni, FDR)
-  - [ ] Include effect size measures (Cohen's d, r²)
-  - **Testing**: Verify statistical test implementations against known results
-  - **Commit**: Use exact message: `feat: implement statistical testing suite`
+- [ ] **Commit 3.11**: Test segmented fitting
+  - [ ] Test with known two-regime data
+  - [ ] Verify changepoint detection
+  - **Commit**: `test: verify segmented power law fitting`
 
-- [ ] **Step 7.2**: Create integration testing
-  - [ ] Create end-to-end validation pipeline
-  - [ ] Add synthetic data generation for testing
-  - [ ] Implement regression tests for key analyses
-  - [ ] Add performance benchmarking
-  - **Testing**: Run full pipeline on synthetic data, verify performance
-  - **Commit**: Use exact message: `feat: add integration tests and validation pipeline`
+- [ ] **Commit 3.12**: Create curvature analysis module
+  - [ ] Create `src/deconcnn/analysis/curvature.py`
+  - [ ] Add module structure
+  - **Commit**: `feat: create curvature analysis module`
 
-- [ ] **Step 7.3**: Add documentation and final polish
-  - [ ] Add detailed README with usage examples
-  - [ ] Create API documentation
-  - [ ] Add troubleshooting guide
-  - [ ] Include performance optimization tips
-  - **Testing**: Review documentation completeness, test examples
-  - **Commit**: Use exact message: `docs: add comprehensive documentation and examples`
+- [ ] **Commit 3.13**: Implement Hutch++ algorithm
+  - [ ] Add `hutchpp_trace()` function
+  - [ ] Improve on Hutchinson estimator
+  - [ ] Include variance reduction
+  - **Commit**: `feat: implement Hutch++ trace estimator`
 
-## Key Implementation Details
+- [ ] **Commit 3.14**: Test Hutch++ implementation
+  - [ ] Create `tests/test_curvature.py`
+  - [ ] Compare with Hutchinson baseline
+  - [ ] Verify variance reduction
+  - **Commit**: `test: verify Hutch++ implementation`
 
-### Mathematical Requirements
-- **AIC Computation**: AIC = 2k - 2ln(L) where k = parameters, L = likelihood (already used in NoiseMonitor)
-- **Hutch++ Upgrade**: Improve existing Hutchinson trace estimator to O(1/ε) complexity
-- **Power Law Fitting**: Enhance existing log-log regression from NoiseMonitor with outlier detection
-- **FFT Analysis**: Refactor existing Welch's method and mid-frequency band filtering from NoiseMonitor
-- **Statistical Testing**: Add proper multiple comparison corrections and effect sizes
+- [ ] **Commit 3.15**: Implement plateau detection
+  - [ ] Add `lambda_plateau_epoch()` function
+  - [ ] Use statistical change detection
+  - [ ] Return plateau start epoch
+  - **Commit**: `feat: implement eigenvalue plateau detection`
 
-### Integration Requirements
-- **Native deconCNN Integration**: Analysis suite lives within deconCNN project structure
-- **Callback Compatibility**: Extracted functions must match existing callback behavior exactly
-- **Direct Data Access**: Use Lightning's built-in metric collection and existing checkpoint data
-- **Hydra Configuration**: Leverage existing Hydra config system for analysis script parameters
+- [ ] **Commit 3.16**: Test plateau detection
+  - [ ] Test with synthetic eigenvalue trajectories
+  - [ ] Verify detection accuracy
+  - **Commit**: `test: verify plateau detection`
 
-### Performance Targets
-- **Analysis Efficiency**: Process 216 experimental runs without memory issues
-- **Backward Compatibility**: Maintain existing callback performance in deconCNN
-- **Computational Efficiency**: Parallel processing for large run sets
-- **Error Handling**: Graceful degradation for missing data or corrupted logs
+### Phase 4: Primary Analysis Scripts (8 commits)
 
-### Validation Strategy
-- **Cross-Validation**: Compare extracted functions with original callback results
-- **Synthetic Data**: Generate known ground truth for new fitting functions
-- **Regression Tests**: Ensure compatibility with existing deconCNN training workflows
-- **Integration Tests**: End-to-end analysis pipeline with real deconCNN experimental data
+- [ ] **Commit 4.1**: Create visualization module
+  - [ ] Create `src/deconcnn/analysis/visualization.py`
+  - [ ] Add basic imports and module structure
+  - **Commit**: `feat: create visualization module`
+
+- [ ] **Commit 4.2**: Implement loss mosaic visualization
+  - [ ] Add `plot_loss_mosaic()` function
+  - [ ] Support 6-panel layout (train/val × 3 scales)
+  - [ ] Add automatic scaling and labeling
+  - **Commit**: `feat: implement loss mosaic visualization`
+
+- [ ] **Commit 4.3**: Test loss mosaic
+  - [ ] Create `tests/test_visualization.py`
+  - [ ] Test layout generation
+  - [ ] Test export formats (PNG/PDF/SVG)
+  - **Commit**: `test: add tests for loss mosaic`
+
+- [ ] **Commit 4.4**: Create knee detection script
+  - [ ] Create `scripts/analysis/A-knee.py`
+  - [ ] Use click CLI interface
+  - [ ] Process all runs and detect burn-in
+  - **Commit**: `feat: create knee detection analysis script`
+
+- [ ] **Commit 4.5**: Create slope analysis script
+  - [ ] Create `scripts/analysis/A-slope.py`
+  - [ ] Compute α_early (5-15) and α_full
+  - [ ] Export results to CSV
+  - **Commit**: `feat: create slope analysis script`
+
+- [ ] **Commit 4.6**: Create model comparison script
+  - [ ] Create `scripts/analysis/A-fits.py`
+  - [ ] Compare exponential/power/two-power models
+  - [ ] Generate AIC comparison table
+  - **Commit**: `feat: create model comparison script`
+
+- [ ] **Commit 4.7**: Test primary analysis scripts
+  - [ ] Create test data subset
+  - [ ] Run all three scripts
+  - [ ] Verify output formats
+  - **Commit**: `test: verify primary analysis scripts`
+
+- [ ] **Commit 4.8**: Add progress tracking to scripts
+  - [ ] Add rich progress bars
+  - [ ] Add error recovery on failure
+  - [ ] Add logging for debugging
+  - **Commit**: `feat: add progress tracking to analysis scripts`
+
+### Phase 5: Supporting Analysis Scripts (12 commits)
+
+- [ ] **Commit 5.1**: Create metric validator module
+  - [ ] Create `src/deconcnn/analysis/metric_validator.py`
+  - [ ] Add basic structure and imports
+  - **Commit**: `feat: create metric validator module`
+
+- [ ] **Commit 5.2**: Implement metric validation
+  - [ ] Add outlier detection methods
+  - [ ] Add consistency checks
+  - [ ] Add cross-experiment validation
+  - **Commit**: `feat: implement metric validation functions`
+
+- [ ] **Commit 5.3**: Test metric validator
+  - [ ] Create `tests/test_metric_validator.py`
+  - [ ] Test outlier detection
+  - [ ] Test validation rules
+  - **Commit**: `test: add tests for metric validator`
+
+- [ ] **Commit 5.4**: Create window robustness script
+  - [ ] Create `scripts/analysis/A-window_scan.py`
+  - [ ] Scan different window sizes for slope
+  - [ ] Generate robustness heatmap
+  - **Commit**: `feat: create window robustness analysis`
+
+- [ ] **Commit 5.5**: Create unit invariance script
+  - [ ] Create `scripts/analysis/A-unit_inv.py`
+  - [ ] Verify nats/bits conversion invariance
+  - [ ] Check numerical stability
+  - **Commit**: `feat: create unit invariance verification`
+
+- [ ] **Commit 5.6**: Create architecture ablation script
+  - [ ] Create `scripts/analysis/A-optim_arch.py`
+  - [ ] Generate ablation comparison table
+  - [ ] Include effect sizes
+  - **Commit**: `feat: create architecture ablation analysis`
+
+- [ ] **Commit 5.7**: Create hyperparameter heatmap script
+  - [ ] Create `scripts/analysis/A-grid_heat.py`
+  - [ ] Generate LR×WD performance heatmap
+  - [ ] Add statistical significance
+  - **Commit**: `feat: create hyperparameter heatmap analysis`
+
+- [ ] **Commit 5.8**: Create noise correlation script
+  - [ ] Create `scripts/analysis/A-noise_corr.py`
+  - [ ] Compute noise proxy correlations
+  - [ ] Add confidence intervals
+  - **Commit**: `feat: create noise correlation analysis`
+
+- [ ] **Commit 5.9**: Create curvature timing script
+  - [ ] Create `scripts/analysis/A-curvature_timing.py`
+  - [ ] Analyze λ₁ plateau vs α knee timing
+  - [ ] Include statistical tests
+  - **Commit**: `feat: create curvature timing analysis`
+
+- [ ] **Commit 5.10**: Add statistical utilities
+  - [ ] Add correlation functions to `utils.py`
+  - [ ] Include Pearson, Spearman, partial
+  - [ ] Add bootstrap confidence intervals
+  - **Commit**: `feat: add statistical correlation utilities`
+
+- [ ] **Commit 5.11**: Test statistical utilities
+  - [ ] Test correlation functions
+  - [ ] Test confidence intervals
+  - [ ] Test edge cases
+  - **Commit**: `test: verify statistical utilities`
+
+- [ ] **Commit 5.12**: Integration test supporting scripts
+  - [ ] Run all supporting scripts
+  - [ ] Verify outputs compatible
+  - [ ] Check performance
+  - **Commit**: `test: verify supporting analysis scripts`
+
+### Phase 6: Slide Generation Notebooks (10 commits)
+
+- [ ] **Commit 6.1**: Create H1 hypothesis notebook
+  - [ ] Create `notebooks/h1_primary.ipynb`
+  - [ ] Add R² histogram visualization
+  - [ ] Add loss mosaic for best/worst fits
+  - **Commit**: `feat: create H1 hypothesis notebook`
+
+- [ ] **Commit 6.2**: Create H2 hypothesis notebook
+  - [ ] Create `notebooks/h2_primary.ipynb`
+  - [ ] Add α_early vs best_val_CE scatter
+  - [ ] Include correlation statistics
+  - **Commit**: `feat: create H2 hypothesis notebook`
+
+- [ ] **Commit 6.3**: Add interactivity to primary notebooks
+  - [ ] Add plotly interactive plots
+  - [ ] Add parameter selection widgets
+  - [ ] Test interactivity
+  - **Commit**: `feat: add interactivity to hypothesis notebooks`
+
+- [ ] **Commit 6.4**: Create model comparison notebook
+  - [ ] Create `notebooks/backup_b_fam.ipynb`
+  - [ ] Add AIC comparison visualizations
+  - [ ] Include model selection analysis
+  - **Commit**: `feat: create model comparison notebook`
+
+- [ ] **Commit 6.5**: Create window robustness notebook
+  - [ ] Create `notebooks/backup_c_window.ipynb`
+  - [ ] Add robustness heatmaps
+  - [ ] Include sensitivity analysis
+  - **Commit**: `feat: create window robustness notebook`
+
+- [ ] **Commit 6.6**: Create architecture ablation notebook
+  - [ ] Create `notebooks/backup_h_arch.ipynb`
+  - [ ] Add ablation result tables
+  - [ ] Include statistical comparisons
+  - **Commit**: `feat: create architecture ablation notebook`
+
+- [ ] **Commit 6.7**: Create curvature exploration notebook
+  - [ ] Create `notebooks/curvature_explore.ipynb`
+  - [ ] Add eigenvalue trajectory plots
+  - [ ] Include plateau analysis
+  - **Commit**: `feat: create curvature exploration notebook`
+
+- [ ] **Commit 6.8**: Add export functionality to notebooks
+  - [ ] Add PNG/PDF export for all plots
+  - [ ] Add LaTeX table export
+  - [ ] Test export quality
+  - **Commit**: `feat: add export functionality to notebooks`
+
+- [ ] **Commit 6.9**: Create notebook utilities
+  - [ ] Create `notebooks/utils.py`
+  - [ ] Add common plotting functions
+  - [ ] Add data loading helpers
+  - **Commit**: `feat: create notebook utility functions`
+
+- [ ] **Commit 6.10**: Test all notebooks
+  - [ ] Run all notebooks end-to-end
+  - [ ] Verify outputs and exports
+  - [ ] Check narrative flow
+  - **Commit**: `test: verify all analysis notebooks`
+
+### Phase 7: Integration & Documentation (8 commits)
+
+- [ ] **Commit 7.1**: Enhance failure recovery
+  - [ ] Enhance `scripts/recover_failed.py`
+  - [ ] Add ML-based failure prediction
+  - [ ] Include adaptive retry strategies
+  - **Commit**: `feat: enhance failure recovery with ML prediction`
+
+- [ ] **Commit 7.2**: Enhance experiment monitoring
+  - [ ] Enhance `scripts/monitor_experiment.py`
+  - [ ] Add variant-specific tracking
+  - [ ] Include completion analytics
+  - **Commit**: `feat: enhance experiment monitoring`
+
+- [ ] **Commit 7.3**: Create job monitoring script
+  - [ ] Create `scripts/monitor_jobs.py`
+  - [ ] Add SLURM job analytics
+  - [ ] Integrate with dr_exp
+  - **Commit**: `feat: create job monitoring script`
+
+- [ ] **Commit 7.4**: Create integration test suite
+  - [ ] Create `tests/test_integration.py`
+  - [ ] Add end-to-end pipeline tests
+  - [ ] Include synthetic data generation
+  - **Commit**: `test: create integration test suite`
+
+- [ ] **Commit 7.5**: Expand operational documentation
+  - [ ] Expand `docs/operational_runbook_basic.md`
+  - [ ] Add troubleshooting scenarios
+  - [ ] Include performance tips
+  - **Commit**: `docs: expand operational runbook`
+
+- [ ] **Commit 7.6**: Create analysis library README
+  - [ ] Create `src/deconcnn/analysis/README.md`
+  - [ ] Add API documentation
+  - [ ] Include usage examples
+  - **Commit**: `docs: create analysis library documentation`
+
+- [ ] **Commit 7.7**: Enhance validation notebook
+  - [ ] Expand `notebooks/validate_metrics_basic.ipynb`
+  - [ ] Add advanced validation checks
+  - [ ] Include data quality reports
+  - **Commit**: `feat: enhance metric validation notebook`
+
+- [ ] **Commit 7.8**: Final integration verification
+  - [ ] Run full analysis pipeline
+  - [ ] Verify all components work together
+  - [ ] Document any issues found
+  - **Commit**: `test: final integration verification`
+
+## Technical Guidelines
+
+### Mathematical Approach
+- Use AIC = 2k - 2ln(L) for model comparison (k = parameters, L = likelihood)
+- Implement Hutch++ for O(1/ε) complexity trace estimation
+- Enhance power law fitting with robust outlier detection
+- Use Welch's method for spectral analysis with proper windowing
+
+### Integration Philosophy  
+- Maintain native deconCNN integration within project structure
+- Ensure extracted functions match existing callback behavior exactly
+- Leverage Lightning's metric collection and checkpoint systems
+- Use Hydra configuration for all analysis script parameters
+
+### Performance Requirements
+- Process 216 experimental runs without memory issues
+- Maintain <15% overhead for callback operations
+- Enable parallel processing for large-scale analysis
+- Implement graceful error handling for incomplete data
+
+### Validation Approach
+- Cross-validate all extracted functions against originals
+- Use synthetic data for testing new mathematical functions
+- Maintain comprehensive regression test suite
+- Perform end-to-end testing with real experimental data
 
 ## Risk Mitigation Updates
 
@@ -409,13 +627,46 @@
 ## Handoff Instructions
 To continue this implementation:
 1. Read the full plan and agent instructions
-2. Check "Current Status" to see where we are
-3. Find the first unchecked [ ] item
-4. Begin implementation from that point
-5. Update status when stopping work
+2. Check "Current Status" to see where we are  
+3. Use TodoWrite to plan your work session
+4. Find the first unchecked [ ] commit
+5. Implement exactly what that commit describes
+6. Run `lint_fix` before committing
+7. Move to the next commit (often a test commit)
+8. Update "Current Status" when stopping work
+
+**Critical**: Follow the atomic commit pattern - each commit should do exactly ONE thing. Don't bundle changes together.
 
 ## Retrospective Notes
 [Track significant decisions and deviations here]
 
 ---
 Remember: Build on existing foundations. Cross-validate extensively. Maintain compatibility.
+
+## Implementation Summary
+
+**Total Commits**: 79 atomic commits organized in 7 phases
+
+**Phase Breakdown**:
+- Phase 0: Environment Setup (3 commits)
+- Phase 1: Library Structure & Function Extraction (12 commits)
+- Phase 2: Enhanced Mathematical Functions (10 commits)
+- Phase 3: Detection & Analysis Functions (16 commits)
+- Phase 4: Primary Analysis Scripts (8 commits)
+- Phase 5: Supporting Analysis Scripts (12 commits)
+- Phase 6: Slide Generation Notebooks (10 commits)
+- Phase 7: Integration & Documentation (8 commits)
+
+**Key Principles**:
+1. Every implementation commit is followed by a test commit
+2. Each commit does exactly ONE thing
+3. Functions are extracted and tested before enhancement
+4. Scripts are created only after their dependencies are tested
+5. Integration testing validates the complete system
+
+**Testing Strategy**:
+- Unit tests for every new function
+- Integration tests for extracted functions
+- End-to-end tests for analysis scripts
+- Notebook verification for all visualizations
+- Final integration test of complete pipeline
