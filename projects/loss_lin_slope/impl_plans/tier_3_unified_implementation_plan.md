@@ -34,9 +34,10 @@ This document provides an atomic implementation plan that gets from 0 to running
 **IMPORTANT: Read these before starting implementation**
 
 1. **Quality Gates**: Before EVERY commit:
-   - Run `lint_fix` and resolve all issues
-   - Run tests and ensure they pass
-   - Fix any issues found, even if pre-existing
+   - Run `lint_fix` and fix ALL errors, even if you didn't create them
+   - Run `pt` (pytest) and ensure ALL tests pass - do NOT commit if any test fails
+   - Fix any issues found, even if pre-existing - the codebase must be clean
+   - NEVER skip these steps or commit with failing tests/lints
 
 2. **Progress Tracking**: 
    - Use TodoWrite/TodoRead tools proactively for tasks with 3+ steps
