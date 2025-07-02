@@ -860,28 +860,66 @@ When running on Mac, you MUST specify `machine=mac` for all training commands to
   - Commit: `test: verify resource allocation on cluster`
 
 - [ ] **Commit 31**: Execute experiment sweep (MANUAL)
-  - Run submission using wrapper script:
+  - Step 1: Submit jobs to dr_exp queue using wrapper script:
     ```bash
-    # Submit all 216 jobs
+    # Submit all 216 jobs to dr_exp queue
     ./scripts/submit_all_loss_slope.sh
     
-    # Or submit individually if needed for resource management:
-    uv run python scripts/submit_experiments.py sweep \
-      configs/experiment/loss_lin_slope_base.yaml \
-      --param lr=0.05,0.1,0.2 \
-      --param weight_decay=1e-4,1e-3,1e-2 \
-      --param seed=0,1,2,3,4,5 \
-      --experiment loss_lin_slope
+    # Verify jobs are queued
+    uv run python scripts/submit_experiments.py list --status queued | grep -c "queued"
+    # Should show 216 queued jobs
+    ```
+  - Step 2: Launch SLURM workers (CRITICAL - uses embedded parameters):
+    ```bash
+    # Create temporary SLURM script with embedded values
+    cat > /tmp/loss_lin_slope_workers_$$.sbatch << 'EOF'
+    #!/bin/bash
+    #SBATCH --job-name=loss_lin_slope_workers
+    #SBATCH --output=/scratch/ddr8143/logs/slurm_logs/%x_%j.out
+    #SBATCH --error=/scratch/ddr8143/logs/slurm_logs/%x_%j.err
+    #SBATCH --time=12:00:00
+    #SBATCH --gres=gpu:rtx8000:8
+    #SBATCH --mem=160G
+    #SBATCH --cpus-per-task=48
+    #SBATCH --account=cds
+    
+    # Setup CUDA MPS for GPU sharing
+    export CUDA_MPS_PIPE_DIRECTORY="/tmp/nvidia-mps-${SLURM_JOB_ID}"
+    export CUDA_MPS_LOG_DIRECTORY="/tmp/nvidia-log-${SLURM_JOB_ID}"
+    mkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
+    nvidia-cuda-mps-control -d
+    
+    # Launch dr_exp workers in container
+    singularity exec --nv --overlay $SCRATCH/drexp.ext3:ro \
+      /scratch/work/public/singularity/cuda11.8.86-cudnn8.7-devel-ubuntu22.04.2.sif \
+      /bin/bash -c "
+        source /scratch/ddr8143/repos/dr_exp/.venv/bin/activate
+        cd /scratch/ddr8143/repos/dr_exp
+        source .env
+        
+        # Launch workers (2 per GPU = 16 total workers)
+        uv run dr_exp --base-path /scratch/ddr8143/repos/deconCNN \
+          --experiment loss_lin_slope \
+          system launcher --workers-per-gpu 2 --max-hours 11
+      "
+    EOF
+    
+    # Submit SLURM job
+    sbatch /tmp/loss_lin_slope_workers_$$.sbatch
+    rm /tmp/loss_lin_slope_workers_$$.sbatch
     ```
   - Monitor execution:
     ```bash
-    # Real-time monitoring
-    watch -n 30 "uv run python scripts/monitor_experiment.py"
+    # Check SLURM job status
+    squeue -u $USER
+    
+    # Monitor dr_exp queue progress
+    watch -n 30 "uv run python scripts/submit_experiments.py list --status all | grep -c completed"
     
     # Check for failures
     uv run python scripts/monitor_experiment.py --show-failed
     ```
-  - Expected timeline: ~12 hours on 24 GPUs
+  - Expected timeline: ~12 hours with 16 workers (2 per GPU × 8 GPUs)
   - Collect results using `scripts/collect_and_archive.sh`
   - Verify completeness: All 216 runs should have R² values and slope metrics
   - Document in commit: total runtime, failure rate, resource usage

@@ -19,8 +19,9 @@
 **What Tier 4 Must Complete:**
 - Analysis library functions (knee detection, power law fitting, metric validation)
 - Extract and modularize existing analysis code from callbacks
-- Enhanced monitoring (improve monitor_experiment.py, create monitor_jobs.py)
-- Enhanced recovery systems (ML-based failure prediction)
+- Advanced SLURM job submission and monitoring infrastructure
+- Intelligent failure recovery with pattern analysis
+- Efficient result collection and archival systems
 - Comprehensive documentation and tutorials
 - Data format conversion utilities (JSON to CSV/Parquet)
 - Missing visualization dependencies (seaborn, plotly, jupyter)
@@ -57,11 +58,11 @@
    - Cross-validate extensively against current behavior
 
 ## Current Status
-- Last updated: 2025-07-02 - Complete restructuring to atomic commits
-- Last completed step: Plan restructured following Tier 3 pattern
+- Last updated: 2025-07-02 - Merged advanced SLURM integration from phase_4_slurm_update.md
+- Last completed step: Plan restructured with advanced SLURM features
 - Active agent: ready for implementation
 - Blocked by: none
-- Total commits: 79 atomic commits across 7 phases
+- Total commits: 82 atomic commits across 7 phases
 
 ## Pre-implementation Checklist
 
@@ -523,51 +524,80 @@
   - [ ] Check narrative flow
   - **Commit**: `test: verify all analysis notebooks`
 
-### Phase 7: Integration & Documentation (8 commits)
+### Phase 7: Advanced SLURM Integration & Documentation (11 commits)
 
-- [ ] **Commit 7.1**: Enhance failure recovery
-  - [ ] Enhance `scripts/recover_failed.py`
-  - [ ] Add ML-based failure prediction
-  - [ ] Include adaptive retry strategies
-  - **Commit**: `feat: enhance failure recovery with ML prediction`
+- [ ] **Commit 7.1**: Create advanced job submission script
+  - [ ] Create `scripts/submit_loss_lin_slope.py` with priority optimization
+  - [ ] Implement parameter grid generation with intelligent prioritization
+  - [ ] Add dry-run and force-resubmit options
+  - [ ] Include test-one mode for validation
+  - [ ] Use dr_exp JobSubmitter API for batch submission
+  - **Commit**: `feat: add loss_lin_slope experiment submission script`
 
-- [ ] **Commit 7.2**: Enhance experiment monitoring
-  - [ ] Enhance `scripts/monitor_experiment.py`
-  - [ ] Add variant-specific tracking
-  - [ ] Include completion analytics
-  - **Commit**: `feat: enhance experiment monitoring`
+- [ ] **Commit 7.2**: Create SLURM worker launcher with embedded parameters
+  - [ ] Create `scripts/launch_workers_embedded.sh`
+  - [ ] Use embedded parameter method to avoid environment variable issues
+  - [ ] Configure CUDA MPS for efficient GPU sharing
+  - [ ] Set up singularity container with dr_exp overlay
+  - [ ] Include automatic cleanup on exit
+  - **Commit**: `feat: add SLURM launcher for loss_lin_slope workers`
 
-- [ ] **Commit 7.3**: Create job monitoring script
-  - [ ] Create `scripts/monitor_jobs.py`
-  - [ ] Add SLURM job analytics
-  - [ ] Integrate with dr_exp
+- [ ] **Commit 7.3**: Create real-time monitoring dashboard
+  - [ ] Replace basic `scripts/monitor_experiment.py` with advanced version
+  - [ ] Add variant-specific tracking and progress visualization
+  - [ ] Implement completion percentage and ETA calculation
+  - [ ] Add failure warnings and alerts
+  - [ ] Use dr_exp JSON output for detailed status
+  - **Commit**: `feat: add real-time experiment monitoring`
+
+- [ ] **Commit 7.4**: Create automatic failure recovery script
+  - [ ] Replace basic `scripts/recover_failed.py` with intelligent version
+  - [ ] Add failure pattern analysis (OOM, gradient explosion, etc.)
+  - [ ] Implement adaptive parameter adjustment for retries
+  - [ ] Include priority boost for failed jobs
+  - [ ] Add interactive resubmission interface
+  - **Commit**: `feat: add automatic failure detection and recovery`
+
+- [ ] **Commit 7.5**: Create efficient result collection script
+  - [ ] Create `scripts/collect_and_archive.sh`
+  - [ ] Implement selective collection of logs and checkpoints
+  - [ ] Add checkpoint compression with gzip
+  - [ ] Create consolidated metrics parquet file
+  - [ ] Generate timestamped archives
+  - **Commit**: `feat: add efficient result collection and archival`
+
+- [ ] **Commit 7.6**: Create job monitoring script
+  - [ ] Create `scripts/monitor_jobs.py` for SLURM job analytics
+  - [ ] Add GPU utilization tracking
+  - [ ] Include worker health monitoring
+  - [ ] Integrate with dr_exp status
   - **Commit**: `feat: create job monitoring script`
 
-- [ ] **Commit 7.4**: Create integration test suite
+- [ ] **Commit 7.7**: Create integration test suite
   - [ ] Create `tests/test_integration.py`
   - [ ] Add end-to-end pipeline tests
   - [ ] Include synthetic data generation
   - **Commit**: `test: create integration test suite`
 
-- [ ] **Commit 7.5**: Expand operational documentation
+- [ ] **Commit 7.8**: Expand operational documentation
   - [ ] Expand `docs/operational_runbook_basic.md`
   - [ ] Add troubleshooting scenarios
   - [ ] Include performance tips
   - **Commit**: `docs: expand operational runbook`
 
-- [ ] **Commit 7.6**: Create analysis library README
+- [ ] **Commit 7.9**: Create analysis library README
   - [ ] Create `src/deconcnn/analysis/README.md`
   - [ ] Add API documentation
   - [ ] Include usage examples
   - **Commit**: `docs: create analysis library documentation`
 
-- [ ] **Commit 7.7**: Enhance validation notebook
+- [ ] **Commit 7.10**: Enhance validation notebook
   - [ ] Expand `notebooks/validate_metrics_basic.ipynb`
   - [ ] Add advanced validation checks
   - [ ] Include data quality reports
   - **Commit**: `feat: enhance metric validation notebook`
 
-- [ ] **Commit 7.8**: Final integration verification
+- [ ] **Commit 7.11**: Final integration verification
   - [ ] Run full analysis pipeline
   - [ ] Verify all components work together
   - [ ] Document any issues found
@@ -645,7 +675,7 @@ Remember: Build on existing foundations. Cross-validate extensively. Maintain co
 
 ## Implementation Summary
 
-**Total Commits**: 79 atomic commits organized in 7 phases
+**Total Commits**: 82 atomic commits organized in 7 phases
 
 **Phase Breakdown**:
 - Phase 0: Environment Setup (3 commits)
@@ -655,7 +685,7 @@ Remember: Build on existing foundations. Cross-validate extensively. Maintain co
 - Phase 4: Primary Analysis Scripts (8 commits)
 - Phase 5: Supporting Analysis Scripts (12 commits)
 - Phase 6: Slide Generation Notebooks (10 commits)
-- Phase 7: Integration & Documentation (8 commits)
+- Phase 7: Advanced SLURM Integration & Documentation (11 commits)
 
 **Key Principles**:
 1. Every implementation commit is followed by a test commit
