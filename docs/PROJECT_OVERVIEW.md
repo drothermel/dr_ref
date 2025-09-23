@@ -48,3 +48,33 @@ flowchart TD
 4. Establish automation for the documentation index (see `scripts/render_agent_index.py`).
 
 For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_MAP.md) and the guides in `docs/guides/`.
+
+## Documentation Index
+<!-- START INDEX -->
+- **Core Docs**
+  - [Project Overview](docs/PROJECT_OVERVIEW.md) — Mission, architecture snapshot.
+  - [Repo Map](docs/REPO_MAP.md) — Purpose + entry points for each repo.
+  - [Data Artifacts](docs/DATA_ARTIFACTS.md) — Existing outputs and planned schemas.
+  - [Roadmap](docs/ROADMAP.md) — Near/long-term priorities.
+
+- **Per-Repo Guides**
+  - [by-tomorrow-app](docs/guides/AGENT_GUIDE_by-tomorrow-app.md) — Per-repo onboarding guide.
+  - [datadec](docs/guides/AGENT_GUIDE_datadec.md) — Per-repo onboarding guide.
+  - [datadec notebooks](docs/guides/AGENT_GUIDE_datadec_notebooks.md) — Per-repo onboarding guide.
+  - [ddpred](docs/guides/AGENT_GUIDE_ddpred.md) — Per-repo onboarding guide.
+  - [dr showntell](docs/guides/AGENT_GUIDE_dr_showntell.md) — Per-repo onboarding guide.
+  - [dr wandb](docs/guides/AGENT_GUIDE_dr_wandb.md) — Per-repo onboarding guide.
+
+- **Process References**
+  - [CODING PRINCIPLES](docs/processes/CODING_PRINCIPLES.md)
+  - [audit synthesis pipeline](docs/processes/audit_synthesis_pipeline.md)
+  - [design philosophy](docs/processes/design_philosophy.md)
+  - [documentation organizer guide](docs/processes/documentation_organizer_guide.md)
+  - [fresh eyes review guide](docs/processes/fresh_eyes_review_guide.md)
+  - [general project extraction prompt](docs/processes/general_project_extraction_prompt.md)
+  - [project consolidation methodology](docs/processes/project_consolidation_methodology.md)
+  - [reporting guide](docs/processes/reporting_guide.md)
+  - [strategic collaboration guide](docs/processes/strategic_collaboration_guide.md)
+  - [tactical execution guide](docs/processes/tactical_execution_guide.md)
+<!-- END INDEX -->
+
