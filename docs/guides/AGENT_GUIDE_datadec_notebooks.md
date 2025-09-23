@@ -30,3 +30,6 @@
 - Capture notebook outputs (metrics, sizes) in text form for agents who cannot run Marimo interactively.
 
 Use this guide when replicating notebook logic or porting it into production scripts.
+
+### Update Log
+- _Add recent changes here._

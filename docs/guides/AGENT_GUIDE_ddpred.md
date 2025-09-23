@@ -38,4 +38,7 @@
 - Some scripts/notebooks are legacy (e.g., `temp_plotter`, `scripts/b*`). Clean up or archive once new pipeline stabilizes.
 - Ensure reproducibility by capturing random seeds and config snapshots in outputs.
 
+### Update Log
+- _Add recent changes here._
+
 Consult this guide alongside `README.md` and analysis scripts when adjusting modelling experiments.

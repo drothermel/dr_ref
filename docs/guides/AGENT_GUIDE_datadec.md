@@ -28,4 +28,7 @@
 - `display.py` and some scripting helpers are stubs; safe to ignore unless reviving CLI plotting.
 - Ensure new ingestion scripts update `paths.DataDecidePaths` or document alternative storage.
 
+### Update Log
+- _Add recent changes here._
+
 Keep this guide in sync when pipeline stages or outputs change.

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import pathlib
 from dataclasses import dataclass
-from typing import Iterable
 
 DOCS_DIR = pathlib.Path("docs")
 OVERVIEW_PATH = DOCS_DIR / "PROJECT_OVERVIEW.md"
@@ -63,9 +62,31 @@ def _list_process_docs() -> list[DocEntry]:
         for path in sorted(proc_dir.glob("*.md")):
             if path.name.lower() == "readme.md":
                 continue
-            title = path.stem.replace("_", " ")
-            entries.append(DocEntry(title=title, path=path))
+            title, summary = _extract_title_and_summary(path)
+            entries.append(DocEntry(title=title, path=path, description=summary))
     return entries
+
+
+def _extract_title_and_summary(path: pathlib.Path) -> tuple[str, str | None]:
+    content = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    heading = None
+    summary = None
+    for line in content:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if heading is None and stripped.startswith("#"):
+            heading = stripped.lstrip("# ")
+            continue
+        if stripped.startswith("#"):
+            continue
+        summary = stripped
+        break
+
+    title = heading or path.stem.replace("_", " ")
+    if summary:
+        summary = (summary[:120] + "…") if len(summary) > 120 else summary
+    return title, summary
 
 
 def build_index() -> str:

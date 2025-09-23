@@ -29,4 +29,7 @@
 - Regex catalogue needs periodic updates as new run naming conventions appear—capture new patterns before they fall into `"other"` bucket.
 - Notebook code is not modularized; consider extracting reusable functions for ingestion scripts.
 
+### Update Log
+- _Add recent changes here._
+
 Treat this repo as the reference for “how to interpret WandB experiments” until the logic migrates into the central ingestion pipeline.

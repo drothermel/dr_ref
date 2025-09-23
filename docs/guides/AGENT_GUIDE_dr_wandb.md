@@ -27,4 +27,7 @@
 - History export currently stores metrics as nested dicts; need flattening or DuckDB `struct` columns.
 - CLI only targets a single project at a time; document multi-project workflow if needed.
 
+### Update Log
+- _Add recent changes here._
+
 Update this guide when the export format changes or when DuckDB ingestion supersedes the Postgres pipeline.

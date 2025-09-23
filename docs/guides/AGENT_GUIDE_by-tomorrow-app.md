@@ -33,3 +33,6 @@
 - Authentication/layout code omitted here—consult routes under `(protected)` and `(public)` if working on broader app features.
 
 Use this guide to orient yourself before modifying frontend components or replacing the backend.
+
+### Update Log
+- _Add recent changes here._
