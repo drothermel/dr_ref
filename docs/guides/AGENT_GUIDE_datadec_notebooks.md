@@ -1,8 +1,8 @@
 # Agent Guide: datadec/notebooks
 
 ## Snapshot
-- **Purpose**: sandbox for the next-generation ingestion stack (DuckDB, Marimo, Altair). Contains prototypes for converting WandB exports to parquet and unpacking QA evaluation tarballs.
-- **Key Files**: `duck_wandb.py`, `start.py`, plus ad-hoc exploration notebooks (`explore_data.py`, etc.).
+- **Purpose**: sandbox for the next-generation ingestion stack (DuckDB, Marimo, Altair). Contains prototypes for converting WandB exports to parquet and unpacking QA evaluation tarballs using shared helpers.
+- **Key Files**: `duck_wandb.py`, `qa_instances_ingest.py`, plus ad-hoc exploration notebooks (`explore_data.py`, etc.).
 
 ## Notebooks
 1. `duck_wandb.py`
@@ -10,10 +10,10 @@
    - Normalizes select summary fields (`oe_eval_metrics`), drops duplicates/constants, creates `runs_clean` table inside DuckDB, and previews data via Quak widget.
    - Demonstrates size savings (~60 MB JSONL → ~5 MB Parquet) and sets the stage for schema design.
 
-2. `start.py`
+2. `qa_instances_ingest.py`
    - Marimo notebook for unpacking Hugging Face QA tarballs.
-   - Uses `attrs` + `cattrs` to map nested JSON to typed dataclasses (`ModelAnswerOutput`, `QuestionOutputData`, `TaskOutputData`).
-   - Experiments with Postgres composite types as an interim schema; lessons carry over to planned DuckDB struct definitions.
+   - Delegates tarball discovery/extraction and JSONL reshaping to `dr_ingest/qa` helpers (schemas + transforms) before previewing structured payloads.
+   - Demonstrates attrs/cattrs structuring for typed question/answer records without relying on Postgres.
 
 3. `explore_data.py`, `explore_wandb_data.py`
    - Legacy exploratory notebooks; safe to skim for context but focus primarily on the two notebooks above.

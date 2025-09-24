@@ -25,7 +25,7 @@ flowchart TD
     PARQUET --> MODELLING
 ```
 
-- **Raw Data Acquisition**: legacy scripts and notebooks pull pretraining metrics from Hugging Face and run logs from WandB. Current experiments rely on Python downloaders (`dr_wandb`, `datadec/notebooks/duck_wandb.py`) and tarball unpackers (`datadec/notebooks/start.py`).
+- **Raw Data Acquisition**: legacy scripts and notebooks pull pretraining metrics from Hugging Face and run logs from WandB. Current experiments rely on Python downloaders (`dr_wandb`, `datadec/notebooks/duck_wandb.py`) and QA evaluation extraction driven by shared helpers in `dr_ingest/qa` (used by `datadec/notebooks/qa_instances_ingest.py`).
 - **Processing & Enrichment**: `dr_ingest` centralizes WandB parsing (regex classification, config normalization) and merges with DataDecide pretraining metrics to produce matched finetune+pretrain tables.
 - **Prediction Stack**: `ddpred` extracts windowed features from pretraining curves and runs cross-validated ElasticNet/GP models to forecast final metrics.
 - **Visualization / Frontend**: `by-tomorrow-app` hosts the Svelte UI; future interactive analysis will lean on Marimo notebooks and DuckDB-backed queries.
@@ -49,6 +49,7 @@ flowchart TD
 
 For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_MAP.md) and the guides in `docs/guides/`.
 
+## Documentation Index
 ## Documentation Index
 ## Documentation Index
 <!-- START INDEX -->
