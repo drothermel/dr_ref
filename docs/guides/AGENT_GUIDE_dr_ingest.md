@@ -10,7 +10,8 @@
 2. `src/dr_ingest/wandb/classifier.py` — run-ID classification driven by catalogue-registered regex specs.
 3. `src/dr_ingest/wandb/postprocess.py` & `processing_context.py` — apply renames, defaults, config merges, and token normalization.
 4. `src/dr_ingest/wandb/metrics.py` & `tokens.py` — canonicalize metric labels and harmonize finetune token counts.
-5. Support utilities: `src/dr_ingest/df_ops.py`, `json_utils.py`, `normalization.py`, `wandb/utils.py`.
+5. QA ingestion helpers: `src/dr_ingest/qa/extraction.py`, `qa/schemas.py`, `qa/transform.py` — shared tarball extraction, attrs/cattrs schemas, and Clumper-based JSONL reshaping for evaluation data.
+6. Support utilities: `src/dr_ingest/df_ops.py`, `json_utils.py`, `normalization.py`, `wandb/utils.py`.
 6. Tests + fixtures under `tests/` and `tests/fixtures/` — sample parquet slices and expectations for classifier/post-processing behavior.
 
 ## Key Modules & Concepts
