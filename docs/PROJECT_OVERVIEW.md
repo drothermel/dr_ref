@@ -50,6 +50,7 @@ flowchart TD
 For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_MAP.md) and the guides in `docs/guides/`.
 
 ## Documentation Index
+## Documentation Index
 <!-- START INDEX -->
 - **Core Docs**
   - [Project Overview](docs/PROJECT_OVERVIEW.md) — Mission, architecture snapshot.
@@ -62,6 +63,7 @@ For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_
   - [datadec](docs/guides/AGENT_GUIDE_datadec.md) — Per-repo onboarding guide.
   - [datadec notebooks](docs/guides/AGENT_GUIDE_datadec_notebooks.md) — Per-repo onboarding guide.
   - [ddpred](docs/guides/AGENT_GUIDE_ddpred.md) — Per-repo onboarding guide.
+  - [dr ingest](docs/guides/AGENT_GUIDE_dr_ingest.md) — Per-repo onboarding guide.
   - [dr wandb](docs/guides/AGENT_GUIDE_dr_wandb.md) — Per-repo onboarding guide.
 
 - **Process References**
@@ -75,4 +77,6 @@ For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_
   - [Project Reporting Guide](docs/processes/reporting_guide.md) — We use two complementary report types optimized for different purposes:
   - [Strategic Collaboration Guide](docs/processes/strategic_collaboration_guide.md) — **You are the conductor, not the performer** - provide strategic frameworks and decision criteria, let executing agents …
   - [Tactical Execution Guide](docs/processes/tactical_execution_guide.md) — You are the **skilled performer** in the conductor-performer paradigm. Your job is to take strategic guidance and framew…
+  - [Tooling Stack Notes](docs/processes/tooling_stack_notes.md) — Overview of lightweight utilities adopted for data ingestion and analysis workflows. These libraries complement `clumper…
 <!-- END INDEX -->
+
