@@ -26,13 +26,13 @@ flowchart TD
 ```
 
 - **Raw Data Acquisition**: legacy scripts and notebooks pull pretraining metrics from Hugging Face and run logs from WandB. Current experiments rely on Python downloaders (`dr_wandb`, `datadec/notebooks/duck_wandb.py`) and tarball unpackers (`datadec/notebooks/start.py`).
-- **Processing & Enrichment**: `dr_showntell` contains the most complete WandB parsing (regex classification, config normalization) and merges with DataDecide pretraining metrics to produce matched finetune+pretrain tables.
+- **Processing & Enrichment**: `dr_ingest` centralizes WandB parsing (regex classification, config normalization) and merges with DataDecide pretraining metrics to produce matched finetune+pretrain tables.
 - **Prediction Stack**: `ddpred` extracts windowed features from pretraining curves and runs cross-validated ElasticNet/GP models to forecast final metrics.
 - **Visualization / Frontend**: `by-tomorrow-app` hosts the Svelte UI; future interactive analysis will lean on Marimo notebooks and DuckDB-backed queries.
 
 ## Status Snapshot
 - ✅ Pretraining parquet pipeline (DataDecide) is stable for Hugging Face datasets.
-- ✅ Robust WandB parsing lives in `dr_showntell`; new DuckDB ingestion notebooks are prototyping direct JSONL → Parquet conversion.
+- ✅ Robust WandB parsing lives in `dr_ingest`; new DuckDB ingestion notebooks are prototyping direct JSONL → Parquet conversion.
 - ✅ Predictive modelling (`ddpred`) works on pretraining-only data with mature CV infrastructure.
 - 🚧 Need to migrate ingestion + cleaning to DuckDB so all repos consume the same structured tables.
 - 🚧 Post-training datasets (finetune evaluation, early-window signals) need schemas + storage strategy.
@@ -43,7 +43,7 @@ flowchart TD
    - WandB run metadata/history (normalized config, eval metrics, matched groups).
    - Hugging Face pretraining datasets (compressed, typed variants of existing parquet).
    - Finetune evaluation outputs (QA task logs, aggregated metrics).
-2. Decide migration path for existing parsing code (e.g., port `dr_showntell` logic into DuckDB transforms or Python loaders that emit structured tables).
+2. Decide migration path for existing parsing code (e.g., harden `dr_ingest` transforms into DuckDB loaders that emit structured tables).
 3. Define the interface between interactive notebooks and the new tables (e.g., canonical views for Altair/Marimo vs. modelling features for `ddpred`).
 4. Establish automation for the documentation index (see `scripts/render_agent_index.py`).
 
@@ -62,7 +62,6 @@ For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_
   - [datadec](docs/guides/AGENT_GUIDE_datadec.md) — Per-repo onboarding guide.
   - [datadec notebooks](docs/guides/AGENT_GUIDE_datadec_notebooks.md) — Per-repo onboarding guide.
   - [ddpred](docs/guides/AGENT_GUIDE_ddpred.md) — Per-repo onboarding guide.
-  - [dr showntell](docs/guides/AGENT_GUIDE_dr_showntell.md) — Per-repo onboarding guide.
   - [dr wandb](docs/guides/AGENT_GUIDE_dr_wandb.md) — Per-repo onboarding guide.
 
 - **Process References**
@@ -77,4 +76,3 @@ For per-repo details and onboarding instructions, see [`docs/REPO_MAP.md`](REPO_
   - [Strategic Collaboration Guide](docs/processes/strategic_collaboration_guide.md) — **You are the conductor, not the performer** - provide strategic frameworks and decision criteria, let executing agents …
   - [Tactical Execution Guide](docs/processes/tactical_execution_guide.md) — You are the **skilled performer** in the conductor-performer paradigm. Your job is to take strategic guidance and framew…
 <!-- END INDEX -->
-

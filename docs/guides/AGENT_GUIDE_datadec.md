@@ -19,7 +19,7 @@
 - `datasets/dataset_*.pkl`: legacy serialized subsets (may be deprecated).
 
 ## Integration Points
-- `dr_showntell` consumes `full_eval.parquet` when enriching WandB runs with pretrain metrics.
+- `dr_ingest` consumes `full_eval.parquet` when enriching WandB runs with pretrain metrics.
 - `ddpred` uses `DataDecide` APIs to fetch filtered windows for early-window features.
 - Future DuckDB ingestion should reuse stage logic but output to shared schemas instead of per-stage parquet.
 

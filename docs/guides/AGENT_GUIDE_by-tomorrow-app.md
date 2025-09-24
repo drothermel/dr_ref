@@ -18,7 +18,7 @@
 - No database; plan is to delete backend once frontend can query DuckDB/ducklake directly.
 
 ## Data Flow Today
-1. Precomputed pickle/parquet (from `dr_showntell`) are copied into `python-backend/initial_data/`.
+1. Precomputed pickle/parquet (generated offline from ingestion notebooks) are copied into `python-backend/initial_data/`.
 2. FastAPI endpoints read entire dataset on each request, perform simple filtering, return JSON.
 3. Frontend fetches these endpoints and renders charts/tables.
 

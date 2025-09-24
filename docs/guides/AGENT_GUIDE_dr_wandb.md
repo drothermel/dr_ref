@@ -18,7 +18,7 @@
 - `runs_history.parquet`: flattened history rows with `_step`, `_timestamp`, `_wandb` fields and metrics map.
 
 ## Integration Points
-- `dr_showntell` reads the exported parquet files for regex parsing and matching to pretrain metrics.
+- `dr_ingest` reads the exported parquet files for regex parsing and matching to pretrain metrics.
 - New DuckDB ingestion notebooks (`datadec/notebooks/duck_wandb.py`) reuse the JSON exports to test schema ideas.
 - Future plan is to replace Postgres dependency with direct DuckDB writes; keep existing ORM as reference until parity is achieved.
 
