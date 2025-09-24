@@ -65,7 +65,7 @@ Use the centralized reference repo (`dr_ref`) to keep onboarding material aligne
 4. **Change Logging**
    - Record significant updates in the “Update Log” placeholder within each guide or core doc to aid future audits.
 
-Follow these steps whenever the documentation landscape evolves so agents can rely on `dr_ref` as the single source of truth.
+Follow these steps whenever the documentation landscape evolves so agents can rely on `dr_ref` as the single source of truth. Record any new tooling choices in [`tooling_stack_notes.md`](tooling_stack_notes.md) for future maintainers.
 
 ## 📋 Mode 1: Systematic Documentation Assessment
 

@@ -7,16 +7,11 @@
 
 ## Reading Order
 1. `src/dr_showntell/run_id_parsing.py` – regex patterns, mapping tables, and post-processing (`apply_processing`) that convert run IDs into structured fields (tokens, checkpoints, comparison models).
-2. `src/dr_showntell/combine_pt_ft_utils.py` – merges processed runs with pretraining metrics, extracts evaluation metrics from WandB summaries, builds matched groups, and adds helper columns.
-3. `src/dr_showntell/datadec_utils.py` – convenience loaders for DataDecide and exported WandB parquet files (paths currently hard-coded).
-4. Notebooks:
-   - `notebooks/quick_demo_modernized.py` – end-to-end demo (parse → validate → pickle export).
-   - `notebooks/combine_processed_with_pretrain_data.py` – generates `combined_plotting_data_*` artifacts.
+2. Legacy pretrain/finetune merge helpers have been removed; rely on the new DuckDB ingestion work in `datadec/notebooks/duck_wandb.py` for evaluation metric normalisation and future joins.
+3. Remaining notebooks are historical debugging aids; expect them to shrink further as the DuckDB-centric pipeline replaces the old pickle workflow.
 
 ## Data Products
-- `data/*_modernized_run_data.pkl`: dictionary with `processed_runs`, `processed_dataframes`, and metadata (used as source for further pipelines).
-- `data/combined_plotting_data_matched.pkl`: enriched table with matched finetune + pretrain metrics (ready for dashboards and modelling).
-- Notebook outputs printed to console (FancyTable) for QA during development.
+- None active. Historical pickles/parquet exports have been removed; future curated tables will come from the DuckDB ingestion work (`datadec/notebooks/duck_wandb.py`).
 
 ## Integration Points
 - Consumes parquet outputs from `dr_wandb` and `datadec`.
