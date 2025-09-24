@@ -6,9 +6,11 @@
 - **Core Strength**: most complete understanding of run naming conventions and feature extraction for post-training evaluation.
 
 ## Reading Order
-1. `src/dr_showntell/run_id_parsing.py` – regex patterns, mapping tables, and post-processing (`apply_processing`) that convert run IDs into structured fields (tokens, checkpoints, comparison models).
-2. Legacy pretrain/finetune merge helpers have been removed; rely on the new DuckDB ingestion work in `datadec/notebooks/duck_wandb.py` for evaluation metric normalisation and future joins.
-3. Remaining notebooks are historical debugging aids; expect them to shrink further as the DuckDB-centric pipeline replaces the old pickle workflow.
+There is no parsing logic left here—only table display utilities:
+1. `src/dr_showntell/fancy_table.py` – Rich table helper with multi-layer headers.
+2. `src/dr_showntell/console_components.py` – Wrapper panels/blocks for rendering tables in Rich consoles.
+3. `src/dr_showntell/table_formatter.py` – Configurable formatting/exports for tables (markdown/csv/etc.).
+Parsing and data munging now live in `dr_ingest` and DuckDB workflows (`datadec/notebooks/duck_wandb.py`).
 
 ## Data Products
 - None active. Historical pickles/parquet exports have been removed; future curated tables will come from the DuckDB ingestion work (`datadec/notebooks/duck_wandb.py`).
