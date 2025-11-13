@@ -86,8 +86,7 @@ Marimo is a reactive notebook that differs from traditional notebooks in key way
 5. Never redeclare variables across cells
 6. Ensure no cycles in notebook dependency graph
 7. The last expression in a cell is automatically displayed, just like in Jupyter notebooks.
-8. Don't include comments in markdown cells
-9. Never define anything using `global`.
+8. Never define anything using `global`.
 
 ## Reactivity
 
@@ -217,7 +216,7 @@ def _():
     x = np.random.rand(n_points.value)
     y = np.random.rand(n_points.value)
 
-    df = pl.DataFrame({"x": x, "y": y})
+    df = pd.DataFrame({"x": x, "y": y})
 
     chart = alt.Chart(df).mark_circle(opacity=0.7).encode(
         x=alt.X('x', title='X axis'),
@@ -305,7 +304,7 @@ def _():
         height=400
     )
 
-    chart
+    mo.ui.altair_chart(chart)
     return
 
 ```
@@ -345,7 +344,7 @@ def _():
     weather_dates = weather.assign(
         date=pd.to_datetime(weather['date'], format="%Y-%m-%d")
     )
-    _chart = (
+    base_chart = (
         alt.Chart(weather_dates)
         .mark_point()
         .encode(
@@ -354,18 +353,19 @@ def _():
             color="location",
         )
     )
+    base_chart
     return
 
 @app.cell
 def _():
-    chart = mo.ui.altair_chart(_chart)
-chart
+    alt_chart = mo.ui.altair_chart(base_chart)
+    alt_chart
     return
 
 @app.cell
 def _():
     # Display the selection
-    chart.value
+    alt_chart.value
     return
 
 ```
