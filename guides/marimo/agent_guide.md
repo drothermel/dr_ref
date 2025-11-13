@@ -18,7 +18,7 @@ def _():
 ## Quick Navigation
 
 - **Reactivity deep dive:** see `marimo-reactivity-general.md` for full rules, patterns, and troubleshooting around DAGs and `.value` usage.
-- **Widget syncing & UI patterns:** see `widgets-sync.md` for run buttons, forms, and grouped inputs.
+- **Widget syncing & UI patterns:** see `widgets-sync.md` for AnyWidget bidirectional patterns, run buttons, forms, and grouped inputs.
 - **API reference dumps:** see `raw-docs-marimo-api.md` and `raw-docs-marimo-guides.md` for verbatim upstream docs.
 - **Reactivity talk track:** see `marimo-reactivity-general.md#12-patterns-concise-battle-tested` for battle-tested code snippets to copy.
 - **When in doubt:** skim this guide first, then jump to the doc above that fits your task.
