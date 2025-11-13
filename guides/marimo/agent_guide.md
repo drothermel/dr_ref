@@ -15,6 +15,53 @@ def _():
 
 ```
 
+## Fast Start Checklist
+
+1. **Inspect the DAG via a flat notebook**: run `uv run marimo export app.py -o flat/app.py` to get a flat script from the notebook to understand the execution order.
+2. **Read existing UI + data cells**: identify UI elements (e.g., sliders, run buttons) and note their names so you avoid redeclaration.
+3. **Stage imports and helpers**: confirm the `app.setup` area exists and imports `marimo as mo`, polars, plotting libs, etc.; add missing imports there before touching downstream cells.
+4. **Add/modify cells inside `@app.cell`**: create new UI/data/visualization cells that reference earlier cells only; remember the last expression auto-renders.
+5. **Wire reactivity intentionally**: when a UI value feeds a transformation, place the transformation in a new cell so updates propagate without manual triggers.
+6. **Validate before handing off**: run `uv run marimo check --fix` and exercise the UI to ensure no circular dependencies, stale state, or naming conflicts remain.
+
+### Canonical notebook skeleton
+
+```python
+import marimo
+
+__generated_with = "0.17.7"
+app = marimo.App(width="columns")
+
+with app.setup:
+    import marimo as mo
+    import polars as pl
+    # add shared imports only once in this setup section
+
+@app.cell
+def _():
+    controls = mo.ui.slider(10, 100, value=25, label="Sample size")
+    controls  # last expression renders the UI element
+    return
+
+@app.cell
+def _():
+    data = load_data(limit=controls.value)
+    data
+    return
+
+@app.cell
+def _():
+    chart = build_chart(data)
+    chart
+    return
+
+@app.cell
+def _():
+    summary = summarize(data)
+    summary
+    return
+```
+
 ## Marimo fundamentals
 
 Marimo is a reactive notebook that differs from traditional notebooks in key ways:
