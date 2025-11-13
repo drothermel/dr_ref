@@ -19,12 +19,14 @@ def _():
 
 1. **Inspect the DAG via a flat notebook**: run `uv run marimo export app.py -o flat/app.py` to get a flat script from the notebook to understand the execution order.
 2. **Read existing UI + data cells**: identify UI elements (e.g., sliders, run buttons) and note their names so you avoid redeclaration.
-3. **Stage imports and helpers**: confirm the `app.setup` area exists and imports `marimo as mo`, polars, plotting libs, etc.; add missing imports there before touching downstream cells.
+3. **Stage imports and helpers**: confirm the `app.setup` area exists and imports `marimo as mo`, pandas, plotting libs, etc.; add missing imports there before touching downstream cells.
 4. **Add/modify cells inside `@app.cell`**: create new UI/data/visualization cells that reference earlier cells only; remember the last expression auto-renders.
 5. **Wire reactivity intentionally**: when a UI value feeds a transformation, place the transformation in a new cell so updates propagate without manual triggers.
 6. **Validate before handing off**: run `uv run marimo check --fix` and exercise the UI to ensure no circular dependencies, stale state, or naming conflicts remain.
 
 ### Canonical notebook skeleton
+
+Leave the generated header exactly as marimo created it; only modify or add cells below the header when you are editing a notebook.
 
 ```python
 import marimo
@@ -34,7 +36,7 @@ app = marimo.App(width="columns")
 
 with app.setup:
     import marimo as mo
-    import polars as pl
+    import pandas as pd
     # add shared imports only once in this setup section
 
 @app.cell
@@ -45,18 +47,21 @@ def _():
 
 @app.cell
 def _():
+    # assumes load_data was defined in an earlier cell or imported helper
     data = load_data(limit=controls.value)
     data
     return
 
 @app.cell
 def _():
+    # assumes build_chart exists upstream
     chart = build_chart(data)
     chart
     return
 
 @app.cell
 def _():
+    # assumes summarize exists upstream
     summary = summarize(data)
     summary
     return
@@ -77,7 +82,7 @@ Marimo is a reactive notebook that differs from traditional notebooks in key way
 1. All code must be complete and runnable
 2. Follow consistent coding style throughout
 3. Include descriptive variable names and helpful comments
-4. Import all modules in the first cell, always including `import marimo as mo`
+4. Import all modules in the `app.setup` section, always including `import marimo as mo`
 5. Never redeclare variables across cells
 6. Ensure no cycles in notebook dependency graph
 7. The last expression in a cell is automatically displayed, just like in Jupyter notebooks.
@@ -108,7 +113,7 @@ Marimo's reactivity means:
 
 <visualization>
 
-- For altair: return the chart object directly. Add tooltips where appropriate. You can pass polars dataframes directly to altair.
+- For altair: return the chart object directly. Add tooltips where appropriate. You can pass pandas dataframes directly to altair.
 - Include proper labels, titles, and color schemes
 - Make visualizations interactive where appropriate
 
@@ -257,29 +262,29 @@ def _():
 def _():
 with app.setup:
     import marimo as mo
-    import polars as pl
+    import pandas as pd
     import altair as alt
     return
 
 @app.cell
 def _():
-    iris = pl.read_csv("hf://datasets/scikit-learn/iris/Iris.csv")
+    df = pd.read_csv("hf://datasets/scikit-learn/iris/Iris.csv")
     return
 
 @app.cell
 def _():
     species_selector = mo.ui.dropdown(
-        options=["All"] + iris["Species"].unique().to_list(),
+        options=["All"] + df["Species"].unique().to_list(),
         value="All",
         label="Species",
     )
     x_feature = mo.ui.dropdown(
-        options=iris.select(pl.col(pl.Float64, pl.Int64)).columns,
+        options=df.select_dtypes(include=["float64", "int64"]).columns
         value="SepalLengthCm",
         label="X Feature",
     )
     y_feature = mo.ui.dropdown(
-        options=iris.select(pl.col(pl.Float64, pl.Int64)).columns,
+        options=df.select_dtypes(include=["float64", "int64"]).columns
         value="SepalWidthCm",
         label="Y Feature",
     )
@@ -288,7 +293,7 @@ def _():
 
 @app.cell
 def _():
-    filtered_data = iris if species_selector.value == "All" else iris.filter(pl.col("Species") == species_selector.value)
+    filtered_data = df if species_selector.value == "All" else df[df['Species'] == species_selector.value]
 
     chart = alt.Chart(filtered_data).mark_circle().encode(
         x=alt.X(x_feature.value, title=x_feature.value),
@@ -402,7 +407,6 @@ def _():
 with app.setup:
     import marimo as mo
     import pandas as pd
-    import duckdb
 
 @app.cell
 def _():
@@ -411,7 +415,7 @@ def _():
 
 @app.cell
 def _():
-    seattle_weather_df = duckdb.sql(
+    seattle_weather_df = mo.sql(
         f"""
         SELECT * FROM weather WHERE location = 'Seattle';
         """
