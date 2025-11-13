@@ -82,8 +82,7 @@ Marimo is a reactive notebook that differs from traditional notebooks in key way
 6. Ensure no cycles in notebook dependency graph
 7. The last expression in a cell is automatically displayed, just like in Jupyter notebooks.
 8. Don't include comments in markdown cells
-9. Don't include comments in SQL cells
-10. Never define anything using `global`.
+9. Never define anything using `global`.
 
 ## Reactivity
 
@@ -99,7 +98,7 @@ Marimo's reactivity means:
 
 <data_handling>
 
-- Use polars for data manipulation
+- Use pandas for data manipulation
 - Implement proper data validation
 - Handle missing values appropriately
 - Use efficient data structures
@@ -109,8 +108,6 @@ Marimo's reactivity means:
 
 <visualization>
 
-- For matplotlib: use plt.gca() as the last expression instead of plt.show()
-- For plotly: return the figure object directly
 - For altair: return the chart object directly. Add tooltips where appropriate. You can pass polars dataframes directly to altair.
 - Include proper labels, titles, and color schemes
 - Make visualizations interactive where appropriate
@@ -127,14 +124,6 @@ Marimo's reactivity means:
 
 </ui_elements>
 
-<sql>
-
-- When writing duckdb, prefer using marimo's SQL cells, which start with df = mo.sql(f"""<your query>""") for DuckDB, or df = mo.sql(f"""<your query>""", engine=engine) for other SQL engines.
-- See the SQL with duckdb example for an example on how to do this
-- Don't add comments in cells that use mo.sql()
-
-</sql>
-
 ## Troubleshooting
 
 Common issues and solutions:
@@ -146,29 +135,24 @@ Common issues and solutions:
 After generating a notebook, run `marimo check --fix` to catch and
 automatically resolve common formatting issues, and detect common pitfalls.
 
-## Available UI elements
+## Available UI input elements
 
-- `mo.ui.altair_chart(altair_chart)`
-- `mo.ui.button(value=None, kind='primary')`
-- `mo.ui.run_button(label=None, tooltip=None, kind='primary')`
-- `mo.ui.checkbox(label='', value=False)`
-- `mo.ui.date(value=None, label=None, full_width=False)`
-- `mo.ui.dropdown(options, value=None, label=None, full_width=False)`
-- `mo.ui.file(label='', multiple=False, full_width=False)`
-- `mo.ui.number(value=None, label=None, full_width=False)`
-- `mo.ui.radio(options, value=None, label=None, full_width=False)`
-- `mo.ui.refresh(options: List[str], default_interval: str)`
-- `mo.ui.slider(start, stop, value=None, label=None, full_width=False, step=None)`
-- `mo.ui.range_slider(start, stop, value=None, label=None, full_width=False, step=None)`
-- `mo.ui.table(data, columns=None, on_select=None, sortable=True, filterable=True)`
-- `mo.ui.text(value='', label=None, full_width=False)`
-- `mo.ui.text_area(value='', label=None, full_width=False)`
-- `mo.ui.data_explorer(df)`
-- `mo.ui.dataframe(df)`
-- `mo.ui.plotly(plotly_figure)`
-- `mo.ui.tabs(elements: dict[str, mo.ui.Element])`
-- `mo.ui.array(elements: list[mo.ui.Element])`
-- `mo.ui.form(element: mo.ui.Element, label='', bordered=True)`
+- `mo.ui.altair_chart(altair_chart)` - wrap altair chart elements to make them reactive
+- `mo.ui.run_button(label=None, tooltip=None, kind='primary')` - gate execution with a button
+- `mo.ui.checkbox(label='', value=False)` - selector elements, great for easy to access multiselection from a semi-short list
+- `mo.ui.multiselect(options, value=None, label=None, full_width=False)` - selector element, great for longer lists and automated select all/none filters
+- `mo.ui.date(value=None, label=None, full_width=False)` - data selector
+- `mo.ui.number(value=None, label=None, full_width=False)` - enter number or shift up and down with arrows
+- `mo.ui.radio(options, value=None, label=None, full_width=False)` - select one from multiple options
+- `mo.ui.text(value='', label=None, full_width=False)` - enter short text element
+- `mo.ui.text_area(value='', label=None, full_width=False)` - enter long text element with newlines
+
+## Reactive grouping elements
+
+- `mo.ui.dictionary(elements: dict[str, mo.ui.Element], label='')` - best option when making multiple ui input elements in a group, allowing to name each while maintaining reactivity
+- `mo.ui.array(elements: list[mo.ui.Element])` - if you just need a list of reactive elements
+- `mo.ui.form(element: mo.ui.Element, label='', bordered=True)` - gate reactive element value change with a run button, web search for more info before using
+- `mo.ui.batch(html: Html, elements: dict[str, mo.ui.Element])` - batch reactive elements into a single html element, web search for more info before using
 
 ## Layout and utility functions
 
