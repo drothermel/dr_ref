@@ -37,34 +37,58 @@ app = marimo.App(width="columns")
 with app.setup:
     import marimo as mo
     import pandas as pd
+    import altair as alt
+
+    DEFAULT_LIMIT = 25
     # add shared imports only once in this setup section
 
 @app.cell
 def _():
-    controls = mo.ui.slider(10, 100, value=25, label="Sample size")
-    controls  # last expression renders the UI element
+    control = mo.ui.number(value=DEFAULT_LIMIT, label="Sample Size")
+    control  # last expression renders the UI element
     return
 
 @app.cell
 def _():
-    # assumes load_data was defined in an earlier cell or imported helper
-    data = load_data(limit=controls.value)
-    data
+    def load_data(parquet_path: str, limit: int = DEFAULT_LIMIT) -> pd.DataFrame:
+        df = pd.read_parquet(parquet_path)
+        return df.sample(n=limit)
+
+    base_df = load_data(parquet_path="data.parquet", limit=control.value)
+    base_df # creates a nice interactive data viewer
     return
 
 @app.cell
 def _():
-    # assumes build_chart exists upstream
-    chart = build_chart(data)
+    def agg_seed(df: pd.DataFrame):
+        return (
+            df.groupby(
+                ["model_size", "task_group", "step"]
+            )
+            .agg({
+                "metrics_loss": "mean",
+                "metrics_acc": "mean",
+                "seed": "count",
+            })
+            .reset_index(drop=True)
+        )
+
+    agg_df = agg_seed(base_df)
+    agg_df
+    return
+
+@app.cell
+def _():
+    def build_chart(df: pd.DataFrame):
+        base = alt.Chart(df)
+        line = base.mark_line().encode(x="step:Q", y="metric_loss:Q", color="task_group:N")
+        circle = base.mark_circle().encode(x="step:Q", y="metric_loss:Q", shape="model_size:N")
+        return (line + circle).properties(width=800, height=400)
+
+    chart = build_chart(agg_df)
     chart
     return
 
-@app.cell
-def _():
-    # assumes summarize exists upstream
-    summary = summarize(data)
-    summary
-    return
 ```
 
 ## Marimo fundamentals
@@ -257,13 +281,10 @@ def _():
 
 ```python
 
-@app.cell
-def _():
 with app.setup:
     import marimo as mo
     import pandas as pd
     import altair as alt
-    return
 
 @app.cell
 def _():
@@ -278,12 +299,12 @@ def _():
         label="Species",
     )
     x_feature = mo.ui.dropdown(
-        options=df.select_dtypes(include=["float64", "int64"]).columns
+        options=df.select_dtypes(include=["float64", "int64"]).columns.tolist(),
         value="SepalLengthCm",
         label="X Feature",
     )
     y_feature = mo.ui.dropdown(
-        options=df.select_dtypes(include=["float64", "int64"]).columns
+        options=df.select_dtypes(include=["float64", "int64"]).columns.tolist(),
         value="SepalWidthCm",
         label="Y Feature",
     )
