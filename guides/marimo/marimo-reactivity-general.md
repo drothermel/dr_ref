@@ -12,6 +12,23 @@
 * **[PROJECT]** your declared, project‑level convention (takes precedence in your repos)
 * **[GUIDANCE]** preferred design pattern (not enforced)
 
+## Contents
+
+1. [Core mental model](#1-core-mental-model)
+2. [Triggers vs. non-triggers](#2-what-triggers-vs-doesnt-trigger-reactivity)
+3. [Globals, locals, naming, and setup](#3-globals-locals-naming-and-setup)
+4. [Display model](#4-display-model-last-expression--output-apis)
+5. [UI elements and functional reactivity](#5-ui-elements-and-functional-reactivity)
+6. [Forms and gating recomputation](#6-forms-and-gating-recomputation)
+7. [`mo.state` essentials](#7-mostate-advanced-rarely-needed)
+8. [Data, charts, and interop](#8-data-charts-and-interop)
+9. [Performance, caching, and runtime modes](#9-performance-caching-and-runtime-modes)
+10. [Idempotence, linting, and debugging](#10-idempotence-linting-and-debugging)
+11. [Known constraints & pitfalls](#11-known-constraints--pitfalls)
+12. [Patterns](#12-patterns-concise-battle-tested)
+13. [Rules vs. recommendations](#13-rules-vs-recommendations-final-checklist)
+14. [Starter template](#14-minimal-starter-template-pandas-first-setup-cell-imports)
+
 ---
 
 ## 1) Core mental model
