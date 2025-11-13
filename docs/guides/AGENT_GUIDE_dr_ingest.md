@@ -1,9 +1,35 @@
 # Agent Guide: dr_ingest
 
+## Quick Navigation
+
+- **WandB acquisition**: see `docs/guides/AGENT_GUIDE_dr_wandb.md` (JSON exports feeding this toolkit).
+- **Pretraining metrics**: see `docs/guides/AGENT_GUIDE_datadec.md` for `full_eval.parquet` consumed during enrichment.
+- **Notebook sandboxes**: see `docs/guides/AGENT_GUIDE_datadec_notebooks.md` for DuckDB prototype notebooks that import these helpers.
+- **Schema plans**: see `docs/DATA_ARTIFACTS.md` for the target DuckDB tables this repo should emit.
+
+## Table of Contents
+
+1. [Snapshot](#snapshot)
+2. [Current Status & High-Priority TODOs](#current-status--high-priority-todos)
+3. [Reading Order](#reading-order)
+4. [Key Modules & Concepts](#key-modules--concepts)
+5. [Common Workflows](#common-workflows)
+6. [Integration Points](#integration-points)
+7. [Known Gaps / TODOs](#known-gaps--todos)
+8. [Update Log](#update-log)
+
 ## Snapshot
 - **Purpose**: shared ingestion toolkit for the DataDecide ecosystem. Hosts canonical WandB parsing, normalization, and ingest-ready transforms that downstream repos can reuse.
-- **Status**: classification + post-processing pipelines now consolidated behind declarative configs. DuckDB export helpers and CLIs are in progress.
 - **Outputs**: cleaned per-run DataFrames (grouped by run type), token-normalized fields, and fixtures for regression tests; future goal is emitting DuckDB tables directly.
+- **Status**: classification + post-processing pipelines now consolidated behind declarative configs. DuckDB export helpers and CLIs are in progress.
+
+## Current Status & High-Priority TODOs
+
+- ✅ Pattern registry + processing context support the main WandB run types (`matched`, `pretrain`, etc.).
+- ✅ QA ingestion helpers (`dr_ingest/qa`) power tarball structuring without Postgres.
+- ⚠️ **DuckDB export**: TODO design & implement canonical DuckDB tables produced directly from `apply_processing`.
+- ⚠️ **CLI tooling**: TODO expose Typer/uv commands for batch ingestion + documentation updates.
+- ⚠️ **History-aware enrichment**: TODO integrate history metrics (LR curves, evals) once schema is available.
 
 ## Reading Order
 1. `src/dr_ingest/wandb/config.py` & `configs/wandb/*.cfg` — layered Confection configs that register patterns, defaults, converters, and hooks.
@@ -33,10 +59,10 @@
 - Future CLIs will provide Typer commands for batch parsing and DuckDB materialization used by frontend experiments (`by-tomorrow-app`).
 
 ## Known Gaps / TODOs
-- Emit standardized DuckDB schemas/tables (runs, history, matched finetune) instead of pandas-only outputs.
-- Broaden run-type hooks beyond `matched` to cover new pipelines (e.g., DPO variants, reduce-loss experiments).
-- Fold history-aware enrichment (learning rate curves, metrics) into `apply_processing` once schema settled.
-- Package Typer CLI entry points for reproducible ingestion jobs and documentation index automation.
+- TODO: emit standardized DuckDB schemas/tables (runs, history, matched finetune) instead of pandas-only outputs.
+- TODO: broaden run-type hooks beyond `matched` to cover new pipelines (e.g., DPO variants, reduce-loss experiments).
+- TODO: fold history-aware enrichment (learning rate curves, metrics) into `apply_processing` once schema settles.
+- TODO: package Typer CLI entry points for reproducible ingestion jobs and documentation index automation.
 
 ### Update Log
 - _Add recent changes here._

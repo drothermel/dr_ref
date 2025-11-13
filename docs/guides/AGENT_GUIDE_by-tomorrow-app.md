@@ -1,8 +1,34 @@
 # Agent Guide: by-tomorrow-app
 
+## Quick Navigation
+
+- **Data sources**: see `docs/guides/AGENT_GUIDE_datadec.md` (pretraining tables) and `docs/guides/AGENT_GUIDE_dr_ingest.md` (WandB normalization).
+- **Notebook prototypes**: see `docs/guides/AGENT_GUIDE_datadec_notebooks.md` for DuckDB + Marimo experiments that feed this UI.
+- **Reactivity/UI details**: see `guides/marimo/` for building interactive notebooks that can complement the app.
+- **API dumps**: see `docs/DATA_ARTIFACTS.md` for current parquet exports powering the backend.
+
+## Table of Contents
+
+1. [Snapshot](#snapshot)
+2. [Current Status & High-Priority TODOs](#current-status--high-priority-todos)
+3. [Reading Order (Frontend)](#reading-order-frontend)
+4. [Backend (FastAPI prototype)](#backend-fastapi-prototype)
+5. [Data Flow Today](#data-flow-today)
+6. [Transition Plan](#transition-plan)
+7. [Known Gaps / Risks](#known-gaps--risks)
+8. [Update Log](#update-log)
+
 ## Snapshot
 - **Purpose**: SvelteKit frontend + FastAPI backend prototype for interactive exploration (tables + charts) of DataDecide/WandB datasets.
 - **Current State**: Hosted on Vercel (frontend) and Railway (backend). Backend serves static parquet slices; plan is to remove it in favor of direct DuckDB queries from the frontend.
+- **Owner**: `repos/by-tomorrow-app`.
+
+## Current Status & High-Priority TODOs
+
+- ✅ Frontend renders sample charts and tables using precomputed parquet slices.
+- ⚠️ **Backend deprecation**: TODO confirm if Railway backend is still required or if DuckDB-in-browser is feasible; document cut-over plan.
+- ⚠️ **Auth/layout context**: TODO capture how `(protected)` routes enforce auth so agents editing data viz don’t break gating.
+- ⚠️ **Data contracts**: TODO sync column naming assumptions with upcoming DuckDB schemas before replacing the backend.
 
 ## Reading Order (Frontend)
 1. `src/routes/(protected)/data_viz/+page.svelte` – landing page linking to demo chart + table views.
@@ -27,10 +53,10 @@
 - Move data fetching logic to point at curated DuckDB tables once schemas are finalized.
 - Use Marimo notebooks for exploratory plots; keep frontend for canonical dashboards.
 
-## Known Issues / TODOs
-- Data service currently hard-coded to `https://api.bytomorrow.app`; parameterize or expose environment variables for local development.
-- LayerChart + DataGrid components assume specific column naming; update when DuckDB schemas change.
-- Authentication/layout code omitted here—consult routes under `(protected)` and `(public)` if working on broader app features.
+## Known Gaps / Risks
+- TODO: parameterize the data service base URL (`dataService.ts`) so local dev isn’t tied to `https://api.bytomorrow.app`.
+- TODO: document column contracts for LayerChart/DataGrid before DuckDB schemas land.
+- TODO: summarize authentication/layout approach from `(protected)` routes for future contributors.
 
 Use this guide to orient yourself before modifying frontend components or replacing the backend.
 
