@@ -17,12 +17,12 @@ def _():
 
 ## Fast Start Checklist
 
-1. **Inspect the DAG via a flat notebook**: run `uv run marimo export app.py -o flat/app.py` to get a flat script from the notebook to understand the execution order.
-2. **Read existing UI + data cells**: identify UI elements (e.g., sliders, run buttons) and note their names so you avoid redeclaration.
+1. **(Optional) Export a flat view for complex notebooks**: when you cannot open the marimo UI, run `uv run marimo export app.py -o flat/app.py` to review the sequential cell order before editing.
+2. **Read existing UI + data cells**: catalog each UI element and its `.value` handle (e.g., `learning_rate_slider` → `learning_rate_slider.value`) so you can reference them later without redeclaring controls.
 3. **Stage imports and helpers**: confirm the `app.setup` area exists and imports `marimo as mo`, pandas, plotting libs, etc.; add missing imports there before touching downstream cells.
 4. **Add/modify cells inside `@app.cell`**: create new UI/data/visualization cells that reference earlier cells only; remember the last expression auto-renders.
 5. **Wire reactivity intentionally**: when a UI value feeds a transformation, place the transformation in a new cell so updates propagate without manual triggers.
-6. **Validate before handing off**: run `uv run marimo check --fix` and exercise the UI to ensure no circular dependencies, stale state, or naming conflicts remain.
+6. **Validate before handing off**: run `uv run marimo check --fix`, spot-check critical cells, and request a human reviewer to exercise the UI so circular dependencies, stale state, or naming conflicts are caught.
 
 ### Canonical notebook skeleton
 
@@ -32,7 +32,7 @@ Leave the generated header exactly as marimo created it; only modify or add cell
 import marimo
 
 __generated_with = "0.17.7"
-app = marimo.App(width="columns")
+app = marimo.App(width="columns")  # columns width keeps wide charts (e.g., 800px) from being clipped
 
 with app.setup:
     import marimo as mo
@@ -44,27 +44,13 @@ with app.setup:
 
 @app.cell
 def _():
-    control = mo.ui.number(value=DEFAULT_LIMIT, label="Sample Size")
-    control  # last expression renders the UI element
-    return
-
-@app.cell
-def _():
     def load_data(parquet_path: str, limit: int = DEFAULT_LIMIT) -> pd.DataFrame:
         df = pd.read_parquet(parquet_path)
         return df.sample(n=limit)
 
-    base_df = load_data(parquet_path="data.parquet", limit=control.value)
-    base_df # creates a nice interactive data viewer
-    return
-
-@app.cell
-def _():
-    def agg_seed(df: pd.DataFrame):
+    def agg_seed(df: pd.DataFrame) -> pd.DataFrame:
         return (
-            df.groupby(
-                ["model_size", "task_group", "step"]
-            )
+            df.groupby(["model_size", "task_group", "step"])
             .agg({
                 "metrics_loss": "mean",
                 "metrics_acc": "mean",
@@ -73,18 +59,34 @@ def _():
             .reset_index(drop=True)
         )
 
-    agg_df = agg_seed(base_df)
-    agg_df
-    return
+    def build_chart(df: pd.DataFrame):
+        base = alt.Chart(df)
+        line = base.mark_line().encode(x="step:Q", y="metrics_loss:Q", color="task_group:N")
+        circle = base.mark_circle().encode(x="step:Q", y="metrics_loss:Q", shape="model_size:N")
+        return (line + circle).properties(width=800, height=400)
+
+    return (load_data, agg_seed, build_chart)
 
 @app.cell
 def _():
-    def build_chart(df: pd.DataFrame):
-        base = alt.Chart(df)
-        line = base.mark_line().encode(x="step:Q", y="metric_loss:Q", color="task_group:N")
-        circle = base.mark_circle().encode(x="step:Q", y="metric_loss:Q", shape="model_size:N")
-        return (line + circle).properties(width=800, height=400)
+    control = mo.ui.number(value=DEFAULT_LIMIT, label="Sample Size")
+    control  # last expression renders the UI element
+    return (control,)
 
+@app.cell
+def _(load_data, control):
+    base_df = load_data(parquet_path="data.parquet", limit=control.value)
+    base_df # creates a nice interactive data viewer
+    return (base_df,)
+
+@app.cell
+def _(base_df):
+    agg_df = agg_seed(base_df)
+    agg_df
+    return (agg_df,)
+
+@app.cell
+def _(agg_df):
     chart = build_chart(agg_df)
     chart
     return
@@ -233,10 +235,10 @@ with app.setup:
 def _():
     n_points = mo.ui.number(value=10, label="Number of points")
     n_points
-    return
+    return (n_points,)
 
 @app.cell
-def _():
+def _(n_points):
     x = np.random.rand(n_points.value)
     y = np.random.rand(n_points.value)
 
@@ -289,30 +291,31 @@ with app.setup:
 @app.cell
 def _():
     df = pd.read_csv("hf://datasets/scikit-learn/iris/Iris.csv")
-    return
+    numeric_columns = df.select_dtypes(include=["float64", "int64"]).columns.tolist()
+    return (df, numeric_columns)
 
 @app.cell
-def _():
+def _(df, numeric_columns):
     species_selector = mo.ui.dropdown(
         options=["All"] + df["Species"].unique().to_list(),
         value="All",
         label="Species",
     )
     x_feature = mo.ui.dropdown(
-        options=df.select_dtypes(include=["float64", "int64"]).columns.tolist(),
+        options=numeric_columns,
         value="SepalLengthCm",
         label="X Feature",
     )
     y_feature = mo.ui.dropdown(
-        options=df.select_dtypes(include=["float64", "int64"]).columns.tolist(),
+        options=numeric_columns,
         value="SepalWidthCm",
         label="Y Feature",
     )
     mo.hstack([species_selector, x_feature, y_feature])
-    return
+    return (species_selector, x_feature, y_feature)
 
 @app.cell
-def _():
+def _(df, species_selector, x_feature, y_feature):
     filtered_data = df if species_selector.value == "All" else df[df['Species'] == species_selector.value]
 
     chart = alt.Chart(filtered_data).mark_circle().encode(
@@ -375,16 +378,16 @@ def _():
         )
     )
     base_chart
-    return
+    return (base_chart,)
 
 @app.cell
-def _():
+def _(base_chart):
     alt_chart = mo.ui.altair_chart(base_chart)
     alt_chart
-    return
+    return (alt_chart,)
 
 @app.cell
-def _():
+def _(alt_chart):
     # Display the selection
     alt_chart.value
     return
@@ -405,42 +408,16 @@ def _():
     first_button = mo.ui.run_button(label="Option 1")
     second_button = mo.ui.run_button(label="Option 2")
     mo.hstack([first_button, second_button])
-    return
+    return (first_button, second_button)
 
 @app.cell
-def _():
+def _(first_button, second_button):
     if first_button.value:
         print("You chose option 1!")
     elif second_button.value:
         print("You chose option 2!")
     else:
         print("Click a button!")
-    return
-
-```
-
-</example>
-
-<example title="SQL with duckdb">
-
-```python
-
-with app.setup:
-    import marimo as mo
-    import pandas as pd
-
-@app.cell
-def _():
-    weather = pd.read_csv('<https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv>')
-    return
-
-@app.cell
-def _():
-    seattle_weather_df = mo.sql(
-        f"""
-        SELECT * FROM weather WHERE location = 'Seattle';
-        """
-    )
     return
 
 ```
