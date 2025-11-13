@@ -2,6 +2,62 @@
 
 This document explains the bidirectional reactivity pattern used in the Config File Manager widget to keep Python (Marimo) and Svelte UI in sync.
 
+## Context
+
+- **Python widget class** (`ConfigFileManager`): exposes traitlets such as `selected_config` that live in the notebook runtime.
+- **Svelte widget component** (`ConfigFileManager.svelte`): renders the UI and stores `lastWritten*` variables via `$state`.
+- **Shared helpers** (`use-file-bindings.ts`, `createFileBindingHandlers`): own the `writeSelectedConfig` logic that actually touches traitlets.
+
+Throughout this guide, “widget” refers to the Python `ConfigFileManager` class, while “component” refers to the Svelte implementation.
+
+## Table of Contents
+
+1. [Quick start wiring](#quick-start-wiring)
+2. [The Problem](#the-problem)
+3. [Why We Need the Write-Back Pattern](#why-we-need-the-write-back-pattern)
+4. [The Implementation](#the-implementation)
+5. [The Complete Flow](#the-complete-flow)
+6. [Why Each Part is Necessary](#why-each-part-is-necessary)
+7. [Common Pitfalls to Avoid](#common-pitfalls-to-avoid)
+8. [Future Considerations](#future-considerations)
+
+## Quick start wiring
+
+Use this minimal setup as a template before diving into the details below.
+
+```python
+# Python notebook cell
+from widgets import ConfigFileManager
+
+widget = ConfigFileManager()
+widget.selected_config  # traitlet that will stay synced via write-back
+```
+
+```svelte
+<!-- ConfigFileManager.svelte -->
+<script lang="ts">
+  import { createFileBindingHandlers } from "./use-file-bindings";
+
+  const bindings = $props.bindings; // traitlets from Python
+  let lastWrittenConfig = $state<string | null | undefined>(undefined);
+
+  const bindingHandlers = createFileBindingHandlers({
+    bindings,
+    writeCallback: (contents) => {
+      lastWrittenConfig = contents;
+    },
+  });
+
+  $effect(() => {
+    if (lastWrittenConfig !== bindings.selected_config) {
+      bindingHandlers.writeSelectedConfig(bindings.selected_config);
+    }
+  });
+</script>
+```
+
+This snippet highlights the only moving parts: track the last value, call the callback before touching the traitlet, and gate the write-back in `$effect`.
+
 ## The Problem
 
 When building AnyWidget components for Marimo notebooks, we need **bidirectional reactivity**:
@@ -326,3 +382,10 @@ $effect(() => {
 ```
 
 This ensures all Python ↔ Svelte state stays reactive in both directions.
+
+### Additional edge cases to plan for
+
+- **Batch traitlet updates:** if you set multiple bindings in a single action, ensure **each traitlet has its own `lastWritten*` tracker and callback** before the shared helper writes to Python. Never reuse one tracker across bindings or only the first change will short-circuit the effect.
+- **Large payloads (e.g., >1 MB configs):** serialization still occurs twice (Python → Svelte → Python). Keep the write-back but consider compressing/streaming payloads and throttling user-triggered writes to avoid UI jank.
+- **Error handling:** if `writeSelectedConfig` can throw (network interruption, validation failure), surface the error to the component and reset `lastWritten*` so the effect retries once the underlying issue is resolved; otherwise you can get stuck with mismatched values.
+- **Initialization defaults:** when the widget creates default data in Python, explicitly document in the component that the first `$effect` will fire and perform a write-back—avoid adding other `bindings.*` mutations inside the same mount frame or you may interleave trackers.
