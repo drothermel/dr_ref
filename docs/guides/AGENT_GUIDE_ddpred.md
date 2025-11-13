@@ -1,10 +1,35 @@
 # Agent Guide: ddpred
 
+## Quick Navigation
+
+- **Data sources**: see `docs/guides/AGENT_GUIDE_datadec.md` (pretraining tables) and future DuckDB schemas in `docs/DATA_ARTIFACTS.md`.
+- **WandB/finetune enrichment**: see `docs/guides/AGENT_GUIDE_dr_ingest.md` for normalized tables this repo should ingest next.
+- **Notebook references**: see `docs/guides/AGENT_GUIDE_datadec_notebooks.md` for exploratory feature work.
+- **Process / roadmap context**: see `docs/ROADMAP.md` for modelling milestones.
+
+## Table of Contents
+
+1. [Snapshot](#snapshot)
+2. [Current Status & High-Priority TODOs](#current-status--high-priority-todos)
+3. [Reading Order](#reading-order)
+4. [Key Concepts](#key-concepts)
+5. [Data Flow](#data-flow)
+6. [Current Outputs](#current-outputs)
+7. [Integration Notes](#integration-notes)
+8. [Known Gaps / TODOs](#known-gaps--todos)
+9. [Update Log](#update-log)
+
 ## Snapshot
 - **Purpose**: research-grade framework for predicting final LLM performance from early training signals.
 - **Inputs**: DataDecide pretraining curves (via `DataDecide` API), optional matched finetune tables.
 - **Outputs**: Cross-validation results, markdown reports, trained models saved under `results/` and `markdowns/`.
 
+## Current Status & High-Priority TODOs
+
+- ✅ ElasticNet + GP trainers work against pretraining-only data with nested CV.
+- ⚠️ **Data abstraction**: TODO decouple from `DataDecide` parquet paths and support DuckDB queries (pretrain + finetune) via a datasource layer.
+- ⚠️ **Feature catalog**: TODO document all feature generators and how they map to schema columns once DuckDB integration lands.
+- ⚠️ **Reproducibility**: TODO standardize experiment config capture (seeds, parameters) in `results/` outputs.
 ## Reading Order
 1. `src/ddpred/core/data_pipeline.py` – `DataPipelineFactory` entry points (`prepare_standard_data`, `prepare_progressive_data`, `prepare_sequence_data`); orchestrates filtering, feature extraction, and target construction.
 2. `src/ddpred/core/data_preparation.py` – converts filtered dataframes into feature matrices / target arrays; handles progressive targets, sequence extraction, scaling.
@@ -33,10 +58,10 @@
 - Feature topology may need expansion once matched finetune metrics are available (e.g., include group-level deltas or finetune tokens).
 
 ## Known Gaps / TODOs
-- Hard-coded reliance on `DataDecide` and parquet paths; introduce abstraction layer for DuckDB queries.
-- Feature metadata is scattered (see `features/__init__.py`); document which features map to which columns in new schema.
-- Some scripts/notebooks are legacy (e.g., `temp_plotter`, `scripts/b*`). Clean up or archive once new pipeline stabilizes.
-- Ensure reproducibility by capturing random seeds and config snapshots in outputs.
+- TODO: replace hard-coded `DataDecide` parquet reliance with an abstraction that can query DuckDB tables.
+- TODO: consolidate feature metadata (currently scattered in `features/__init__.py`) and map each to schema columns.
+- TODO: audit legacy scripts/notebooks (e.g., `temp_plotter`, `scripts/b*`) and archive or update once new pipeline stabilizes.
+- TODO: capture random seeds and config snapshots in outputs for reproducibility.
 
 ### Update Log
 - _Add recent changes here._
