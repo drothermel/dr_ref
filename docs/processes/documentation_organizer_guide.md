@@ -50,6 +50,23 @@ You are the **organizational memory curator** for this multi-agent collaboration
 - **Date Integration**: Timestamps in filenames for tactical/project documents
 - **Logical Grouping**: Directory structure reflects information architecture
 
+### Documentation Hub Workflow (dr_ref)
+
+Use the centralized reference repo (`dr_ref`) to keep onboarding material aligned:
+
+1. **Core Docs Maintenance**
+   - Update `docs/PROJECT_OVERVIEW.md`, `docs/REPO_MAP.md`, `docs/DATA_ARTIFACTS.md`, and `docs/ROADMAP.md` when architecture or priorities shift.
+   - After editing guides or process docs, run `uv run python scripts/render_agent_index.py` to regenerate the index section in `PROJECT_OVERVIEW.md`.
+2. **Per-Repo Guide Sync**
+   - Each active repo has `AGENT_GUIDE_*.md` under `docs/guides/`. Keep the “Known Gaps / TODOs” and “Update Log” current whenever workflows change.
+   - Ensure each external repo README links back to its corresponding agent guide.
+3. **Process Documents**
+   - Store collaboration methodologies under `docs/processes/`; the indexing script automatically pulls headings and summaries for the documentation index.
+4. **Change Logging**
+   - Record significant updates in the “Update Log” placeholder within each guide or core doc to aid future audits.
+
+Follow these steps whenever the documentation landscape evolves so agents can rely on `dr_ref` as the single source of truth. Record any new tooling choices in [`tooling_stack_notes.md`](tooling_stack_notes.md) for future maintainers.
+
 ## 📋 Mode 1: Systematic Documentation Assessment
 
 ### Phase 1: Discovery and Cataloging
