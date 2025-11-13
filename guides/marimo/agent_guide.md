@@ -165,6 +165,11 @@ automatically resolve common formatting issues, and detect common pitfalls.
 - `mo.hstack(elements)` - stack elements horizontally
 - `mo.vstack(elements)` - stack elements vertically
 - `mo.tabs(elements)` - create a tabbed interface
+- `mo.accordion(items: dict[str, Any], multiple: bool)` - fold down accordion of panels
+- `mo.carousel(items: Sequence[object])` - create a slide deck style carousel of elements
+- `mo.json(data: str | dict | list)` - display JSON  as an interactive tree
+- `mo.tree(items: list | tuple | dict)` - nested data as an interactive tree
+
 
 ## Examples
 
@@ -190,17 +195,15 @@ def _():
 
 ```python
 
-@app.cell
-def _():
+with app.setup:
     import marimo as mo
     import altair as alt
-    import polars as pl
+    import pandas as pd
     import numpy as np
-    return
 
 @app.cell
 def _():
-    n_points = mo.ui.slider(10, 100, value=50, label="Number of points")
+    n_points = mo.ui.number(value=10, label="Number of points")
     n_points
     return
 
@@ -220,28 +223,26 @@ def _():
         height=300
     )
 
-    chart
+    mo.ui.altair_chart(chart)
     return
 
 ```
 
 </example>
 
-<example title="Data explorer">
+<example title="Dataframe Interaction">
 
 ```python
 
-@app.cell
-def _():
+with app.setup:
     import marimo as mo
-    import polars as pl
+    import pandas as pd
     from vega_datasets import data
-    return
 
 @app.cell
 def _():
-    cars_df = pl.DataFrame(data.cars())
-    mo.ui.data_explorer(cars_df)
+    cars_df = pd.DataFrame(data.cars())
+    cars_df # This provides a great interactive dataframe viewer
     return
 
 ```
@@ -254,6 +255,7 @@ def _():
 
 @app.cell
 def _():
+with app.setup:
     import marimo as mo
     import polars as pl
     import altair as alt
@@ -308,10 +310,10 @@ def _():
 <example title="Conditional Outputs">
 
 ```python
+
 @app.cell
 def _():
     mo.stop(not data.value, mo.md("No data to display"))
-
     if mode.value == "scatter":
         mo.output.replace(render_scatter(data.value))
     else:
@@ -325,19 +327,18 @@ def _():
 <example title="Interactive chart with Altair">
 
 ```python
-@app.cell
-def _():
+
+with app.setup:
     import marimo as mo
     import altair as alt
-    import polars as pl
-    return
+    import pandas as pd
 
 @app.cell
 def _():
     # Load dataset
-    weather = pl.read_csv("<https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv>")
-    weather_dates = weather.with_columns(
-        pl.col("date").str.strptime(pl.Date, format="%Y-%m-%d")
+    weather = pd.read_csv("<https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv>")
+    weather_dates = weather.assign(
+        date=pd.to_datetime(weather['date'], format="%Y-%m-%d")
     )
     _chart = (
         alt.Chart(weather_dates)
@@ -370,16 +371,14 @@ def _():
 
 ```python
 
-@app.cell
-def _():
+with app.setup:
     import marimo as mo
-    return
 
 @app.cell
 def _():
     first_button = mo.ui.run_button(label="Option 1")
     second_button = mo.ui.run_button(label="Option 2")
-    [first_button, second_button]
+    mo.hstack([first_button, second_button])
     return
 
 @app.cell
@@ -400,20 +399,19 @@ def _():
 
 ```python
 
-@app.cell
-def _():
+with app.setup:
     import marimo as mo
-    import polars as pl
+    import pandas as pd
+    import duckdb
+
+@app.cell
+def _():
+    weather = pd.read_csv('<https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv>')
     return
 
 @app.cell
 def _():
-    weather = pl.read_csv('<https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv>')
-    return
-
-@app.cell
-def _():
-    seattle_weather_df = mo.sql(
+    seattle_weather_df = duckdb.sql(
         f"""
         SELECT * FROM weather WHERE location = 'Seattle';
         """
